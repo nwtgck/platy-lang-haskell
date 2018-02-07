@@ -264,14 +264,28 @@ gdefToGdefCodegen (LetGdef (Bind {ident=Ident name, ty, bodyExpr})) = do
   case exprToOperandEither bodyExpr of
     Right (bodyOperand, ExprCodegenEnv{basicBlocks}) -> do
       -- NOTE: Should avoid to using PLATY_GLOBAL_RES if an user uses this name then fail
-      let funcDef   = [Quote.LLVM.lldef|
-        define void $gid:initFuncName(){
-          $bbs:basicBlocks
-          %PLATY_GLOBAL_RES = $opr:bodyOperand
-          store $type:llvmTy %PLATY_GLOBAL_RES, $type:llvmPtrTy $gid:globalName
-          ret void
-        }
-      |]
+      let funcDef   =
+           -- (this if is for just avoid empty $bbs)
+           if Prelude.null basicBlocks
+            then
+              [Quote.LLVM.lldef|
+                define void $gid:initFuncName(){
+                entry:
+                  %PLATY_GLOBAL_RES = $opr:bodyOperand
+                  store $type:llvmTy %PLATY_GLOBAL_RES, $type:llvmPtrTy $gid:globalName
+                  ret void
+                }
+              |]
+            else
+             [Quote.LLVM.lldef|
+              define void $gid:initFuncName(){
+              entry:
+                $bbs:basicBlocks
+                ;%PLATY_GLOBAL_RES = $opr:bodyOperand
+                ;store $type:llvmTy %PLATY_GLOBAL_RES, $type:llvmPtrTy $gid:globalName
+                ret void
+              }
+            |]
       -- Add the init-function
       addInitFunc funcDef
 
@@ -328,7 +342,7 @@ gdefsToModule gdefs = do
 
 
   return AST.defaultModule{
-    AST.moduleDefinitions =  [globalCtorsDef, globalInitFuncDef] ++ definitions ++ globalInitFuncs
+    AST.moduleDefinitions =  [globalCtorsDef, globalInitFuncDef]++ definitions ++ globalInitFuncs
   }
 
 
@@ -350,18 +364,24 @@ main = do
   print exprCodeEnv2
 
   putStrLn("====================================")
-  let gdef1 = LetGdef {bind=Bind {ident=Ident "myint", ty=IntTy, bodyExpr=IfExpr (LitExpr $ BoolLit True) (LitExpr $ IntLit 81818) (LitExpr $ IntLit 23232)}}
-  let gdef2 = LetGdef {bind=Bind {ident=Ident "myint2", ty=IntTy, bodyExpr=IfExpr (LitExpr $ BoolLit True) (LitExpr $ IntLit 7117) (LitExpr $ IntLit 9889)}}
-  let Right mod1 = gdefsToModule [gdef1, gdef2]
-  TIO.putStrLn (LLVM.Pretty.ppllvm mod1)
-  putStrLn("----------------------------------")
+--  let gdef1 = LetGdef {bind=Bind {ident=Ident "myint", ty=IntTy, bodyExpr=IfExpr (LitExpr $ BoolLit True) (LitExpr $ IntLit 81818) (LitExpr $ IntLit 23232)}}
+--  let gdef2 = LetGdef {bind=Bind {ident=Ident "myint2", ty=IntTy, bodyExpr=IfExpr (LitExpr $ BoolLit True) (LitExpr $ IntLit 7117) (LitExpr $ IntLit 9889)}}
+--  let Right mod1 = gdefsToModule [gdef1, gdef2]
+--  TIO.putStrLn (LLVM.Pretty.ppllvm mod1)
+--  putStrLn("----------------------------------")
 
   --  ERROR: EncodeException "The serialized GlobalReference has type PointerType {pointerReferent = FunctionType {resultType = VoidType, argumentTypes = [], isVarArg = False}, pointerAddrSpace = AddrSpace 0} but should have type FunctionType {resultType = VoidType, argumentTypes = [], isVarArg = False}"
 --  toLLVM mod1
 
---  let gdef2 = LetGdef {bind=Bind {ident=Ident "myint", ty=IntTy, bodyExpr=LitExpr $ IntLit 2929}}
---  let mod2Either = gdefsToModule [gdef2]
---  print mod2Either
-----  toLLVM mod2
+  let gdef2 = LetGdef {bind=Bind {ident=Ident "myint", ty=IntTy, bodyExpr=LitExpr $ IntLit 2929}}
+  let mod2Either = gdefsToModule [gdef2]
+  let Right mod2 = mod2Either
+  print mod2
+  putStrLn("----------------------------------")
+  TIO.putStrLn (LLVM.Pretty.ppllvm mod2)
+  putStrLn("----------------------------------")
+  TIO.putStrLn (LLVM.Pretty.ppll mod2)
+  putStrLn("----------------------------------")
+--  toLLVM mod2
 
 
