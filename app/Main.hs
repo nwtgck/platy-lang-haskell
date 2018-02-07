@@ -68,7 +68,20 @@ data Gdef =
   FuncGdef {ident :: Ident, params :: [Param], retTy :: Ty, bodyExpr :: Expr}
 
 
+-- | Lit => LLVM Type
+litToLLVMType :: Lit -> AST.Type
+litToLLVMType (IntLit _)  = AST.IntegerType {typeBits=nIntBits}
+litToLLVMType (CharLit _) = AST.IntegerType {typeBits=8}
+litToLLVMType (BoolLit _) = AST.IntegerType {typeBits=1}
+litToLLVMType (UnitLit)   = AST.IntegerType {typeBits=1}
 
+-- | Expr => LLVM Type
+exprToLLVMType :: Expr -> AST.Type
+exprToLLVMType (LitExpr lit)       = litToLLVMType lit
+exprToLLVMType (IdentExpr _)       = undefined -- TODO impl
+exprToLLVMType (IfExpr {thenExpr}) = exprToLLVMType thenExpr
+exprToLLVMType (ApplyExpr{})       = undefined -- TODO impl
+exprToLLVMType (LetExpr{inExpr})   = exprToLLVMType inExpr
 
 
 
@@ -184,7 +197,7 @@ exprToExprCodegen (IfExpr {condExpr, thenExpr, elseExpr}) = do
   -- Add endblock
   addBasicBlock endBlock
 
-  let ty = AST.Type.i32 -- TODO: Implement (Find type from then-operand or other information...)
+  let ty = exprToLLVMType thenExpr
   return $ AST.LocalReference ty endValueName
 
 
