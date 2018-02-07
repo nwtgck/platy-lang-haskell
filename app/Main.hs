@@ -4,6 +4,8 @@
 module Main where
 
 import Control.Monad.State
+import qualified Data.Char
+
 import qualified LLVM.AST as AST
 import LLVM.AST( Named( (:=) ) )
 import qualified LLVM.Quote.LLVM as Quote.LLVM
@@ -12,6 +14,11 @@ import qualified LLVM.Context as Context
 import qualified LLVM.AST.Type as AST.Type
 import qualified LLVM.AST.Constant as AST.Constant
 import qualified LLVM.AST.Global as AST.Global
+
+
+-- ====== Global Language Settings ======
+nIntBits = 32
+
 
 -- TODO: Move datatypes to a single file
 
@@ -73,14 +80,20 @@ newtype ExprCodegen a = ExprCodegen {runExprCodegen :: StateT ExprCodegenEnv (Ei
   deriving (Functor, Applicative, Monad, MonadState ExprCodegenEnv)
 
 
--- TODO: Impl
-exprToCodegen :: Expr -> ExprCodegen AST.Operand
-exprToCodegen (LitExpr lit) = return (AST.ConstantOperand AST.Constant.Int {AST.Constant.integerBits=32, AST.Constant.integerValue=868686}) -- TODO: impl
+-- | Lit => Operand
+litToOperand :: Lit -> AST.Operand
+litToOperand (IntLit i)   = AST.ConstantOperand AST.Constant.Int {AST.Constant.integerBits=nIntBits, AST.Constant.integerValue=toInteger i}
+litToOperand (CharLit ch) = AST.ConstantOperand AST.Constant.Int {AST.Constant.integerBits=8, AST.Constant.integerValue=toInteger $ Data.Char.ord ch}
+litToOperand (BoolLit b)  = AST.ConstantOperand AST.Constant.Int {AST.Constant.integerBits=1, AST.Constant.integerValue=if b then 1 else 0}
+litToOperand (UnitLit)    = AST.ConstantOperand AST.Constant.Int {AST.Constant.integerBits=1, AST.Constant.integerValue=1}
 
+-- TODO: Impl
+exprToExprCodegen :: Expr -> ExprCodegen AST.Operand
+exprToExprCodegen (LitExpr lit) = return (litToOperand lit)
 
 -- | Expr => Operand
 exprToOperandEither :: Expr -> Either ErrorType AST.Operand
-exprToOperandEither expr = evalStateT (runExprCodegen $ exprToCodegen expr) initEnv
+exprToOperandEither expr = evalStateT (runExprCodegen $ exprToExprCodegen expr) initEnv
   where
     initEnv = ExprCodegenEnv {
                  basicBlocks = []
