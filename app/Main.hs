@@ -14,6 +14,7 @@ import Control.Monad (mapM_)
 import qualified Data.ByteString.Char8 as BS
 import Data.String      (IsString(..))
 import Data.ByteString.Short
+import qualified Data.Text.Lazy.IO as TIO
 
 import qualified LLVM.AST as AST
 import LLVM.AST( Named( (:=) ) )
@@ -23,6 +24,7 @@ import qualified LLVM.Context as Context
 import qualified LLVM.AST.Type as AST.Type
 import qualified LLVM.AST.Constant as AST.Constant
 import qualified LLVM.AST.Global as AST.Global
+import qualified LLVM.Pretty
 
 
 import Debug.Trace
@@ -201,7 +203,7 @@ exprToExprCodegen (IfExpr {condExpr, thenExpr, elseExpr}) = do
   let AST.GlobalDefinition AST.Global.Function{basicBlocks=[endBlock]} = [Quote.LLVM.lldef|
     define void @_(){
     $id:endLabel
-      $id:endValueName = phi i32 [$id:thenValueName, $id:thenLabel], [$id:thenValueName, $id:elseLabel]
+      $id:endValueName = phi i32 [$id:thenValueName, $id:thenLabel], [$id:elseValueName, $id:elseLabel]
     }
   |]
   -- Add endblock
@@ -252,7 +254,7 @@ addInitFunc initFunc = do
 gdefToGdefCodegen :: Gdef -> GdefCodegen ()
 gdefToGdefCodegen (LetGdef (Bind {ident=Ident name, ty, bodyExpr})) = do
   let globalName   = AST.Name (strToShort [Here.i|${name}/ptr|])
-      initFuncName = AST.Name (strToShort [Here.i|PLATY_INIT_${name}|])
+      initFuncName = AST.Name (strToShort [Here.i|$$PLATY_INIT/${name}|])
       llvmTy       = AST.Type.i32 -- TODO: Hard code
       llvmPtrTy    = AST.Type.ptr llvmTy
   let globalDef = [Quote.LLVM.lldef| $gid:globalName = global $type:llvmTy undef |]
@@ -299,33 +301,34 @@ gdefsToModule gdefs = do
     [{ i32, void ()*, i8* } { i32 65535, void ()* $gid:globalInitFuncName, i8* null }]
   |]
 
---  let initFuncCalls :: [AST.Named AST.Instruction]
---      initFuncCalls = fmap (\name -> AST.Do [Quote.LLVM.lli| call void $id:name() |]) globalInitFuncNames
-  let initFuncCalls :: [Either AST.Instruction AST.Terminator]
-      initFuncCalls = fmap (\name -> Left [Quote.LLVM.lli| call void $id:name() |]) globalInitFuncNames
+  let initFuncCalls :: [AST.Named AST.Instruction]
+      initFuncCalls = fmap (\name -> AST.Do [Quote.LLVM.lli| call void $gid:name() |]) globalInitFuncNames
+--  let initFuncCalls :: [Either AST.Instruction AST.Terminator]
+--      initFuncCalls = fmap (\name -> Left [Quote.LLVM.lli| call void $gid:name() |]) globalInitFuncNames
       initFuncCall = head initFuncCalls
       gname = head globalInitFuncNames
-  let globalInitFuncDef = [Quote.LLVM.lldef|
-    define void $gid:globalInitFuncName(){
-    entry:
-      ;call void $gid:gname()
-      ;call void @PLATY_INIT_myint()
-      ;$instr:initFuncCall
-      ;call void $gid:globalInitFuncName()
-      ret void
-    }
-  |]
---  let globalInitFuncBlock = AST.Global.BasicBlock (AST.Name "entry") initFuncCalls (AST.Do AST.Ret {AST.returnOperand = Nothing, AST.metadata' = []})
 --  let globalInitFuncDef = [Quote.LLVM.lldef|
 --    define void $gid:globalInitFuncName(){
---      $bb:globalInitFuncBlock
+--    entry:
+--      ;call void $gid:gname()
+--      ;call void @PLATY_INIT_myint()
+--      ;$instr:initFuncCall
+--      $instrs:initFuncCalls
+--      ;call void $gid:globalInitFuncName()
+--      ret void
 --    }
 --  |]
+  let globalInitFuncBlock = AST.Global.BasicBlock (AST.Name "entry") initFuncCalls (AST.Do AST.Ret {AST.returnOperand = Nothing, AST.metadata' = []})
+  let globalInitFuncDef = [Quote.LLVM.lldef|
+    define void $gid:globalInitFuncName(){
+      $bb:globalInitFuncBlock
+    }
+  |]
 
 
 
-  trace ("****************" ++ show globalInitFuncDef) $ return AST.defaultModule{
-    AST.moduleDefinitions = globalInitFuncs ++ [globalCtorsDef, globalInitFuncDef] ++ definitions
+  return AST.defaultModule{
+    AST.moduleDefinitions =  [globalCtorsDef, globalInitFuncDef] ++ definitions ++ globalInitFuncs
   }
 
 
@@ -334,7 +337,6 @@ toLLVM mod = Context.withContext $ \ctx -> do
   llvm <- Module.withModuleFromAST ctx mod Module.moduleLLVMAssembly
   BS.putStrLn llvm
 
--- TODO: Implement
 main :: IO ()
 main = do
   let expr1 = LitExpr (IntLit 1515)
@@ -349,12 +351,17 @@ main = do
 
   putStrLn("====================================")
   let gdef1 = LetGdef {bind=Bind {ident=Ident "myint", ty=IntTy, bodyExpr=IfExpr (LitExpr $ BoolLit True) (LitExpr $ IntLit 81818) (LitExpr $ IntLit 23232)}}
-  let Right mod1 = gdefsToModule [gdef1]
-  toLLVM mod1
-  putStrLn "HERE"
+  let gdef2 = LetGdef {bind=Bind {ident=Ident "myint2", ty=IntTy, bodyExpr=IfExpr (LitExpr $ BoolLit True) (LitExpr $ IntLit 7117) (LitExpr $ IntLit 9889)}}
+  let Right mod1 = gdefsToModule [gdef1, gdef2]
+  TIO.putStrLn (LLVM.Pretty.ppllvm mod1)
+  putStrLn("----------------------------------")
+
+  --  ERROR: EncodeException "The serialized GlobalReference has type PointerType {pointerReferent = FunctionType {resultType = VoidType, argumentTypes = [], isVarArg = False}, pointerAddrSpace = AddrSpace 0} but should have type FunctionType {resultType = VoidType, argumentTypes = [], isVarArg = False}"
+--  toLLVM mod1
 
 --  let gdef2 = LetGdef {bind=Bind {ident=Ident "myint", ty=IntTy, bodyExpr=LitExpr $ IntLit 2929}}
 --  let mod2Either = gdefsToModule [gdef2]
 --  print mod2Either
 ----  toLLVM mod2
+
 

@@ -48,6 +48,7 @@ extra-deps:
 - git: git@github.com:nwtgck/llvm-hs-quote.git
   commit: ccc4df9499e7309e9b72a1e44cce201b31f26d2b
 - mainland-pretty-0.2.7.2
+- llvm-hs-pretty-0.2.0.0
 
 
 # Override default flag values for local packages and extra-deps
