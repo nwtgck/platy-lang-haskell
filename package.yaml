@@ -37,6 +37,7 @@ executables:
 #    - platy-lang
      - mtl
      - bytestring
+     - here
      - llvm-hs
      - llvm-hs-pure
      - llvm-hs-quote

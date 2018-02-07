@@ -42,8 +42,11 @@ packages:
 extra-deps:
 # llvm-hs-quote
 # (original repo)
-- git: git@github.com:llvm-hs/llvm-hs-quote.git
-  commit: 390358bf8cfafd96b76fa856b4274abc9de21c6e
+#- git: git@github.com:llvm-hs/llvm-hs-quote.git
+#  commit: 390358bf8cfafd96b76fa856b4274abc9de21c6e
+## (my forked repo)
+- git: git@github.com:nwtgck/llvm-hs-quote.git
+  commit: ccc4df9499e7309e9b72a1e44cce201b31f26d2b
 - mainland-pretty-0.2.7.2
 
 
