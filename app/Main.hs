@@ -9,6 +9,11 @@ module Main where
 import Control.Monad.State
 import qualified Data.Char
 import qualified Data.String.Here as Here
+import Data.String.Interpolate as Interpolate
+import Control.Monad (mapM_)
+import qualified Data.ByteString.Char8 as BS
+import Data.String      (IsString(..))
+import Data.ByteString.Short
 
 import qualified LLVM.AST as AST
 import LLVM.AST( Named( (:=) ) )
@@ -20,8 +25,11 @@ import qualified LLVM.AST.Constant as AST.Constant
 import qualified LLVM.AST.Global as AST.Global
 
 
+import Debug.Trace
+
 -- ====== Global Language Settings ======
 nIntBits = 32
+globalInitFuncName = AST.Name "PLATY_GLOBALS_INIT"
 
 
 -- TODO: Move datatypes to a single file
@@ -61,11 +69,13 @@ data Expr =
 
 -- | Parameter
 data Param = Param {ident :: Ident, ty :: Ty}
+  deriving (Show)
 
 -- Global definition
 data Gdef =
   LetGdef  {bind :: Bind} |
   FuncGdef {ident :: Ident, params :: [Param], retTy :: Ty, bodyExpr :: Expr}
+  deriving (Show)
 
 
 -- | Lit => LLVM Type
@@ -130,15 +140,15 @@ exprToExprCodegen (IfExpr {condExpr, thenExpr, elseExpr}) = do
   freshCount <- getFreshCount
   -- Label prefix
   let labelPrefix = [Here.i|$$if${freshCount}|] :: String
-      ifcondValueName  = AST.Name [Here.i|${labelPrefix}/cond|]
-      thenValueName    = AST.Name [Here.i|${labelPrefix}/thenRes|]
-      elseValueName    = AST.Name [Here.i|${labelPrefix}/elseRes|]
-      endValueName     = AST.Name [Here.i|${labelPrefix}/endRes|]
+      ifcondValueName  = AST.Name (strToShort [Here.i|${labelPrefix}/cond|])
+      thenValueName    = AST.Name (strToShort [Here.i|${labelPrefix}/thenRes|])
+      elseValueName    = AST.Name (strToShort [Here.i|${labelPrefix}/elseRes|])
+      endValueName     = AST.Name (strToShort [Here.i|${labelPrefix}/endRes|])
 
-      startLabel   = AST.Name [Here.i|${labelPrefix}/start|]
-      thenLabel   = AST.Name [Here.i|${labelPrefix}/then|]
-      elseLabel   = AST.Name [Here.i|${labelPrefix}/else|]
-      endLabel    = AST.Name [Here.i|${labelPrefix}/end|]
+      startLabel  = AST.Name (strToShort [Here.i|${labelPrefix}/start|])
+      thenLabel   = AST.Name (strToShort [Here.i|${labelPrefix}/then|])
+      elseLabel   = AST.Name (strToShort [Here.i|${labelPrefix}/else|])
+      endLabel    = AST.Name (strToShort [Here.i|${labelPrefix}/end|])
 
   -- Eval condExpr to Operand
   condOperand <- exprToExprCodegen condExpr
@@ -148,7 +158,7 @@ exprToExprCodegen (IfExpr {condExpr, thenExpr, elseExpr}) = do
     define void @_(){
     $id:startLabel
       $id:ifcondValueName = $opr:condOperand
-      br i1 %ifcond, label $id:thenLabel, label $id:elseLabel
+      br i1 $id:ifcondValueName, label $id:thenLabel, label $id:elseLabel
     }
   |]
   -- Add then block
@@ -162,7 +172,7 @@ exprToExprCodegen (IfExpr {condExpr, thenExpr, elseExpr}) = do
   -- FIXME: In the future, llbb may be added, then rewrite
   let AST.GlobalDefinition AST.Global.Function{basicBlocks=[thenBlock]} = [Quote.LLVM.lldef|
     define void @_(){
-    $id:elseLabel
+    $id:thenLabel
       $id:thenValueName = $opr:thenOperand
       br label $id:endLabel
     }
@@ -210,6 +220,120 @@ exprToOperandEither expr = runStateT (runExprCodegen $ exprToExprCodegen expr) i
               , count       = 0
               }
 
+-- (for preventing "\22" in [Here.i])
+strToShort :: String -> ShortByteString
+strToShort = (toShort . BS.pack)
+
+data GdefCodegenEnv =
+ GdefCodegenEnv {
+   definitions         :: [AST.Definition]
+ , globalInitFuncs     :: [AST.Definition]
+ , globalInitFuncNames :: [AST.Name] -- TODO: This should be deleted because globalInitFuncs contains this information
+ }
+ deriving (Show)
+
+newtype GdefCodegen a = GdefCodegen {runGdefCodegen :: StateT GdefCodegenEnv (Either ErrorType) a}
+  deriving (Functor, Applicative, Monad, MonadState GdefCodegenEnv)
+
+
+-- Add a definition
+addDefinition :: AST.Definition -> GdefCodegen ()
+addDefinition def = do
+  defs <- gets definitions
+  modify (\env -> env{definitions=defs++[def]})
+
+-- Add an init-funcitoin
+addInitFunc :: AST.Definition -> GdefCodegen ()
+addInitFunc initFunc = do
+  funcs <- gets globalInitFuncs
+  modify (\env -> env{globalInitFuncs=funcs++[initFunc]})
+
+-- TODO: impl
+gdefToGdefCodegen :: Gdef -> GdefCodegen ()
+gdefToGdefCodegen (LetGdef (Bind {ident=Ident name, ty, bodyExpr})) = do
+  let globalName   = AST.Name (strToShort [Here.i|${name}/ptr|])
+      initFuncName = AST.Name (strToShort [Here.i|PLATY_INIT_${name}|])
+      llvmTy       = AST.Type.i32 -- TODO: Hard code
+      llvmPtrTy    = AST.Type.ptr llvmTy
+  let globalDef = [Quote.LLVM.lldef| $gid:globalName = global $type:llvmTy undef |]
+  -- Add the definition
+  addDefinition globalDef
+
+  case exprToOperandEither bodyExpr of
+    Right (bodyOperand, ExprCodegenEnv{basicBlocks}) -> do
+      -- NOTE: Should avoid to using PLATY_GLOBAL_RES if an user uses this name then fail
+      let funcDef   = [Quote.LLVM.lldef|
+        define void $gid:initFuncName(){
+          $bbs:basicBlocks
+          %PLATY_GLOBAL_RES = $opr:bodyOperand
+          store $type:llvmTy %PLATY_GLOBAL_RES, $type:llvmPtrTy $gid:globalName
+          ret void
+        }
+      |]
+      -- Add the init-function
+      addInitFunc funcDef
+
+      -- Add the function name
+      funcNames <- gets globalInitFuncNames
+      modify (\env -> env{globalInitFuncNames=funcNames++[initFuncName]})
+      return ()
+
+    Left error -> fail error
+
+
+
+-- | [Gdef] => AST.Module
+-- TODO: impl
+gdefsToModule :: [Gdef] -> Either ErrorType AST.Module
+gdefsToModule gdefs = do
+  let initEnv = GdefCodegenEnv {
+                  definitions         = []
+                , globalInitFuncs     = []
+                , globalInitFuncNames = []
+                }
+  GdefCodegenEnv{definitions, globalInitFuncs, globalInitFuncNames} <- execStateT (runGdefCodegen $ mapM_ gdefToGdefCodegen gdefs) initEnv
+
+
+  let globalCtorsDef = [Quote.LLVM.lldef|
+   @llvm.global_ctors = appending global [1 x { i32, void ()*, i8* }]
+    [{ i32, void ()*, i8* } { i32 65535, void ()* $gid:globalInitFuncName, i8* null }]
+  |]
+
+--  let initFuncCalls :: [AST.Named AST.Instruction]
+--      initFuncCalls = fmap (\name -> AST.Do [Quote.LLVM.lli| call void $id:name() |]) globalInitFuncNames
+  let initFuncCalls :: [Either AST.Instruction AST.Terminator]
+      initFuncCalls = fmap (\name -> Left [Quote.LLVM.lli| call void $id:name() |]) globalInitFuncNames
+      initFuncCall = head initFuncCalls
+      gname = head globalInitFuncNames
+  let globalInitFuncDef = [Quote.LLVM.lldef|
+    define void $gid:globalInitFuncName(){
+    entry:
+      ;call void $gid:gname()
+      ;call void @PLATY_INIT_myint()
+      ;$instr:initFuncCall
+      ;call void $gid:globalInitFuncName()
+      ret void
+    }
+  |]
+--  let globalInitFuncBlock = AST.Global.BasicBlock (AST.Name "entry") initFuncCalls (AST.Do AST.Ret {AST.returnOperand = Nothing, AST.metadata' = []})
+--  let globalInitFuncDef = [Quote.LLVM.lldef|
+--    define void $gid:globalInitFuncName(){
+--      $bb:globalInitFuncBlock
+--    }
+--  |]
+
+
+
+  trace ("****************" ++ show globalInitFuncDef) $ return AST.defaultModule{
+    AST.moduleDefinitions = globalInitFuncs ++ [globalCtorsDef, globalInitFuncDef] ++ definitions
+  }
+
+
+toLLVM :: AST.Module -> IO ()
+toLLVM mod = Context.withContext $ \ctx -> do
+  llvm <- Module.withModuleFromAST ctx mod Module.moduleLLVMAssembly
+  BS.putStrLn llvm
+
 -- TODO: Implement
 main :: IO ()
 main = do
@@ -222,3 +346,15 @@ main = do
   let Right (operand2, exprCodeEnv2) = exprToOperandEither expr2
   print operand2
   print exprCodeEnv2
+
+  putStrLn("====================================")
+  let gdef1 = LetGdef {bind=Bind {ident=Ident "myint", ty=IntTy, bodyExpr=IfExpr (LitExpr $ BoolLit True) (LitExpr $ IntLit 81818) (LitExpr $ IntLit 23232)}}
+  let Right mod1 = gdefsToModule [gdef1]
+  toLLVM mod1
+  putStrLn "HERE"
+
+--  let gdef2 = LetGdef {bind=Bind {ident=Ident "myint", ty=IntTy, bodyExpr=LitExpr $ IntLit 2929}}
+--  let mod2Either = gdefsToModule [gdef2]
+--  print mod2Either
+----  toLLVM mod2
+

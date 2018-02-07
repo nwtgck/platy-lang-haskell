@@ -38,6 +38,7 @@ executables:
      - mtl
      - bytestring
      - here
+     - interpolate
      - llvm-hs
      - llvm-hs-pure
      - llvm-hs-quote
