@@ -39,7 +39,13 @@ packages:
 - .
 # Dependency packages to be pulled from upstream that are not in the resolver
 # (e.g., acme-missiles-0.3)
-# extra-deps: []
+extra-deps:
+# llvm-hs-quote
+# (original repo)
+- git: git@github.com:llvm-hs/llvm-hs-quote.git
+  commit: 390358bf8cfafd96b76fa856b4274abc9de21c6e
+- mainland-pretty-0.2.7.2
+
 
 # Override default flag values for local packages and extra-deps
 # flags: {}
