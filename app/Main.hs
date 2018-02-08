@@ -293,6 +293,20 @@ gdefToGdefCodegen (LetGdef (Bind {ident=Ident name, ty, bodyExpr})) = do
       -- Add the init-function
       addInitFunc funcDef
 
+      -- Definition of $$global_getter
+      let getterFuncName = AST.Name (strToShort [Here.i|$$global_getter/${name}|])
+          getterFuncDef = [Quote.LLVM.lldef|
+            define $type:llvmTy $gid:getterFuncName(){
+            entry:
+              %res = load $type:llvmPtrTy $gid:globalName
+              ret $type:llvmTy %res
+            }
+          |]
+
+      -- Add a global variable getter
+      addDefinition getterFuncDef
+
+
       return ()
 
     Left error -> fail error
