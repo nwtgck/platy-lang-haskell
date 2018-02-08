@@ -255,7 +255,7 @@ addInitFunc initFunc = do
   funcs <- gets globalInitFuncs
   modify (\env -> env{globalInitFuncs=funcs++[initFunc]})
 
--- TODO: impl
+-- Gdef => GdefCodegen
 gdefToGdefCodegen :: Gdef -> GdefCodegen ()
 gdefToGdefCodegen (LetGdef (Bind {ident=Ident name, ty, bodyExpr})) = do
   let globalName   = AST.Name (strToShort [Here.i|${name}/ptr|])
@@ -297,7 +297,40 @@ gdefToGdefCodegen (LetGdef (Bind {ident=Ident name, ty, bodyExpr})) = do
       return ()
 
     Left error -> fail error
+gdefToGdefCodegen (FuncGdef {ident=Ident name, params, retTy, bodyExpr}) = do
+  case exprToOperandEither bodyExpr of
+      Right (bodyOperand, ExprCodegenEnv{basicBlocks}) -> do
+        let funcName  = AST.Name (strToShort name)
+            llvmRetTy = tyToLLVMTy retTy
 
+        -- NOTE: Should avoid to using PLATY_GLOBAL_RES if an user uses this name then fail
+        let funcDef   =
+             -- (this if is for just avoid empty $bbs)
+             if Prelude.null basicBlocks
+              then
+                [Quote.LLVM.lldef|
+                  define $type:llvmRetTy $gid:funcName(){
+                  entry:
+                    %PLATY_GLOBAL_RES = $opr:bodyOperand
+                    ret $type:llvmRetTy %PLATY_GLOBAL_RES
+                  }
+                |]
+              else
+               [Quote.LLVM.lldef|
+                define $type:llvmRetTy $gid:funcName(){
+                entry:
+                  $bbs:basicBlocks
+                  %PLATY_GLOBAL_RES = $opr:bodyOperand
+                  ret $type:llvmRetTy %PLATY_GLOBAL_RES
+                }
+              |]
+        -- Add to the definitions
+        addDefinition funcDef
+
+        return ()
+
+      Left error -> fail error
+  return ()
 
 
 -- | [Gdef] => AST.Module
@@ -362,15 +395,22 @@ main = do
 
   toLLVM mod1
 
-  let gdef2 = LetGdef {bind=Bind {ident=Ident "myint", ty=IntTy, bodyExpr=LitExpr $ IntLit 2929}}
-  let mod2Either = gdefsToModule [gdef2]
+  let gdef3 = LetGdef {bind=Bind {ident=Ident "myint", ty=IntTy, bodyExpr=LitExpr $ IntLit 2929}}
+  let mod2Either = gdefsToModule [gdef3]
   let Right mod2 = mod2Either
 --  print mod2
   putStrLn("----------------------------------")
 --  TIO.putStrLn (LLVM.Pretty.ppllvm mod2)
 --  putStrLn("----------------------------------")
 --  TIO.putStrLn (LLVM.Pretty.ppll mod2)
---  putStrLn("----------------------------------")
   toLLVM mod2
+  putStrLn("----------------------------------")
+
+
+  let gdef4 :: Gdef
+      gdef4 = FuncGdef {ident=Ident "myfunc", params=[], retTy=IntTy, bodyExpr=LitExpr $ IntLit 32323}
+  let Right mod3 = gdefsToModule [gdef4]
+  toLLVM mod3
+  putStrLn("----------------------------------")
 
 
