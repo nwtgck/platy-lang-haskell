@@ -15,7 +15,7 @@
 # resolver:
 #  name: custom-snapshot
 #  location: "./custom-snapshot.yaml"
-resolver: lts-10.2
+resolver: lts-10.3
 
 # User packages to be built.
 # Various formats can be used as shown in the example below.
@@ -46,8 +46,9 @@ extra-deps:
 #  commit: 390358bf8cfafd96b76fa856b4274abc9de21c6e
 ## (my forked repo)
 - git: git@github.com:nwtgck/llvm-hs-quote.git
-  commit: ccc4df9499e7309e9b72a1e44cce201b31f26d2b
+  commit: bc789ff94c6b6363e348a439ac57a212b4592f22
 - mainland-pretty-0.2.7.2
+- llvm-hs-pretty-0.2.0.0
 
 
 # Override default flag values for local packages and extra-deps

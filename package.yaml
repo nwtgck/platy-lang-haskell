@@ -37,9 +37,12 @@ executables:
 #    - platy-lang
      - mtl
      - bytestring
+     - text
      - here
+     - interpolate
      - llvm-hs
      - llvm-hs-pure
+     - llvm-hs-pretty
      - llvm-hs-quote
 
 tests:
