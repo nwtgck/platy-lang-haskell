@@ -79,6 +79,12 @@ data Gdef =
   FuncGdef {ident :: Ident, params :: [Param], retTy :: Ty, bodyExpr :: Expr}
   deriving (Show)
 
+-- | Ty => LLVM Type
+tyToLLVMTy :: Ty -> AST.Type
+tyToLLVMTy IntTy  = AST.IntegerType {typeBits=nIntBits}
+tyToLLVMTy CharTy = AST.IntegerType {typeBits=8}
+tyToLLVMTy BoolTy = AST.IntegerType {typeBits=1}
+tyToLLVMTy UnitTy = AST.IntegerType {typeBits=1}
 
 -- | Lit => LLVM Type
 litToLLVMType :: Lit -> AST.Type
@@ -254,7 +260,7 @@ gdefToGdefCodegen :: Gdef -> GdefCodegen ()
 gdefToGdefCodegen (LetGdef (Bind {ident=Ident name, ty, bodyExpr})) = do
   let globalName   = AST.Name (strToShort [Here.i|${name}/ptr|])
       initFuncName = AST.Name (strToShort [Here.i|$$PLATY_INIT/${name}|])
-      llvmTy       = AST.Type.i32 -- TODO: Hard code
+      llvmTy       = tyToLLVMTy ty
       llvmPtrTy    = AST.Type.ptr llvmTy
   let globalDef = [Quote.LLVM.lldef| $gid:globalName = global $type:llvmTy undef |]
   -- Add the definition
@@ -354,7 +360,6 @@ main = do
 --  TIO.putStrLn (LLVM.Pretty.ppllvm mod1)
   putStrLn("----------------------------------")
 
-  --  ERROR: EncodeException "The serialized GlobalReference has type PointerType {pointerReferent = FunctionType {resultType = VoidType, argumentTypes = [], isVarArg = False}, pointerAddrSpace = AddrSpace 0} but should have type FunctionType {resultType = VoidType, argumentTypes = [], isVarArg = False}"
   toLLVM mod1
 
   let gdef2 = LetGdef {bind=Bind {ident=Ident "myint", ty=IntTy, bodyExpr=LitExpr $ IntLit 2929}}
