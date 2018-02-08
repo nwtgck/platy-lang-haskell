@@ -119,9 +119,8 @@ newtype ExprCodegen a = ExprCodegen {runExprCodegen :: StateT ExprCodegenEnv (Ei
 getFreshCount :: ExprCodegen Int
 getFreshCount = do
   c <- gets count
-  let newC = c + 1
-  modify (\env -> env {count = newC})
-  return newC
+  modify (\env -> env {count = c+1})
+  return c
 
 
 -- | Lit => Operand
