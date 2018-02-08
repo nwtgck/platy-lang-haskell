@@ -295,7 +295,6 @@ gdefToGdefCodegen (LetGdef (Bind {ident=Ident name, ty, bodyExpr})) = do
 
 
 -- | [Gdef] => AST.Module
--- TODO: impl
 gdefsToModule :: [Gdef] -> Either ErrorType AST.Module
 gdefsToModule gdefs = do
   let initEnv = GdefCodegenEnv {
