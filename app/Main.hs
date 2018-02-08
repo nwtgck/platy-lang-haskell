@@ -230,7 +230,6 @@ data GdefCodegenEnv =
  GdefCodegenEnv {
    definitions         :: [AST.Definition]
  , globalInitFuncs     :: [AST.Definition]
- , globalInitFuncNames :: [AST.Name] -- TODO: This should be deleted because globalInitFuncs contains this information
  }
  deriving (Show)
 
@@ -289,9 +288,6 @@ gdefToGdefCodegen (LetGdef (Bind {ident=Ident name, ty, bodyExpr})) = do
       -- Add the init-function
       addInitFunc funcDef
 
-      -- Add the function name
-      funcNames <- gets globalInitFuncNames
-      modify (\env -> env{globalInitFuncNames=funcNames++[initFuncName]})
       return ()
 
     Left error -> fail error
@@ -305,44 +301,33 @@ gdefsToModule gdefs = do
   let initEnv = GdefCodegenEnv {
                   definitions         = []
                 , globalInitFuncs     = []
-                , globalInitFuncNames = []
                 }
-  GdefCodegenEnv{definitions, globalInitFuncs, globalInitFuncNames} <- execStateT (runGdefCodegen $ mapM_ gdefToGdefCodegen gdefs) initEnv
-
+  GdefCodegenEnv{definitions, globalInitFuncs} <- execStateT (runGdefCodegen $ mapM_ gdefToGdefCodegen gdefs) initEnv
 
   let globalCtorsDef = [Quote.LLVM.lldef|
    @llvm.global_ctors = appending global [1 x { i32, void ()*, i8* }]
     [{ i32, void ()*, i8* } { i32 65535, void ()* $gid:globalInitFuncName, i8* null }]
   |]
 
-  let initFuncCalls :: [AST.Named AST.Instruction]
+  let -- Names of global init-funcs
+      globalInitFuncNames :: [AST.Name]
+      globalInitFuncNames = [name | AST.GlobalDefinition AST.Global.Function{name} <- globalInitFuncs]
+
+      -- Call instructions of init-funcs
+      initFuncCalls :: [AST.Named AST.Instruction]
       initFuncCalls = fmap (\name -> AST.Do [Quote.LLVM.lli| call void $gid:name() |]) globalInitFuncNames
---  let initFuncCalls :: [Either AST.Instruction AST.Terminator]
---      initFuncCalls = fmap (\name -> Left [Quote.LLVM.lli| call void $gid:name() |]) globalInitFuncNames
-      initFuncCall = head initFuncCalls
-      gname = head globalInitFuncNames
---  let globalInitFuncDef = [Quote.LLVM.lldef|
---    define void $gid:globalInitFuncName(){
---    entry:
---      ;call void $gid:gname()
---      ;call void @PLATY_INIT_myint()
---      ;$instr:initFuncCall
---      $instrs:initFuncCalls
---      ;call void $gid:globalInitFuncName()
---      ret void
---    }
---  |]
-  let globalInitFuncBlock = AST.Global.BasicBlock (AST.Name "entry") initFuncCalls (AST.Do AST.Ret {AST.returnOperand = Nothing, AST.metadata' = []})
-  let globalInitFuncDef = [Quote.LLVM.lldef|
-    define void $gid:globalInitFuncName(){
-      $bb:globalInitFuncBlock
-    }
-  |]
 
-
+      -- (FIXME: It's better to use $instrs instead of %bb, but currently $instrs doesn't work well)
+      globalInitFuncBlock = AST.Global.BasicBlock (AST.Name "entry") initFuncCalls (AST.Do AST.Ret {AST.returnOperand = Nothing, AST.metadata' = []})
+      globalInitFuncDef = [Quote.LLVM.lldef|
+        define void $gid:globalInitFuncName(){
+          $bb:globalInitFuncBlock
+        }
+      |]
 
   return AST.defaultModule{
-    AST.moduleDefinitions =  [globalCtorsDef, globalInitFuncDef]++ definitions ++ globalInitFuncs
+    AST.moduleDefinitions =
+      [globalCtorsDef, globalInitFuncDef]++ definitions ++ globalInitFuncs
   }
 
 
