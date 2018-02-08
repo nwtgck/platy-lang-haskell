@@ -364,24 +364,24 @@ main = do
   print exprCodeEnv2
 
   putStrLn("====================================")
---  let gdef1 = LetGdef {bind=Bind {ident=Ident "myint", ty=IntTy, bodyExpr=IfExpr (LitExpr $ BoolLit True) (LitExpr $ IntLit 81818) (LitExpr $ IntLit 23232)}}
---  let gdef2 = LetGdef {bind=Bind {ident=Ident "myint2", ty=IntTy, bodyExpr=IfExpr (LitExpr $ BoolLit True) (LitExpr $ IntLit 7117) (LitExpr $ IntLit 9889)}}
---  let Right mod1 = gdefsToModule [gdef1, gdef2]
+  let gdef1 = LetGdef {bind=Bind {ident=Ident "myint", ty=IntTy, bodyExpr=IfExpr (LitExpr $ BoolLit True) (LitExpr $ IntLit 81818) (LitExpr $ IntLit 23232)}}
+  let gdef2 = LetGdef {bind=Bind {ident=Ident "myint2", ty=IntTy, bodyExpr=IfExpr (LitExpr $ BoolLit True) (LitExpr $ IntLit 7117) (LitExpr $ IntLit 9889)}}
+  let Right mod1 = gdefsToModule [gdef1, gdef2]
 --  TIO.putStrLn (LLVM.Pretty.ppllvm mod1)
---  putStrLn("----------------------------------")
+  putStrLn("----------------------------------")
 
   --  ERROR: EncodeException "The serialized GlobalReference has type PointerType {pointerReferent = FunctionType {resultType = VoidType, argumentTypes = [], isVarArg = False}, pointerAddrSpace = AddrSpace 0} but should have type FunctionType {resultType = VoidType, argumentTypes = [], isVarArg = False}"
---  toLLVM mod1
+  toLLVM mod1
 
   let gdef2 = LetGdef {bind=Bind {ident=Ident "myint", ty=IntTy, bodyExpr=LitExpr $ IntLit 2929}}
   let mod2Either = gdefsToModule [gdef2]
   let Right mod2 = mod2Either
-  print mod2
+--  print mod2
   putStrLn("----------------------------------")
-  TIO.putStrLn (LLVM.Pretty.ppllvm mod2)
-  putStrLn("----------------------------------")
-  TIO.putStrLn (LLVM.Pretty.ppll mod2)
-  putStrLn("----------------------------------")
---  toLLVM mod2
+--  TIO.putStrLn (LLVM.Pretty.ppllvm mod2)
+--  putStrLn("----------------------------------")
+--  TIO.putStrLn (LLVM.Pretty.ppll mod2)
+--  putStrLn("----------------------------------")
+  toLLVM mod2
 
 
