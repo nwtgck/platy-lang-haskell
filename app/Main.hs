@@ -414,3 +414,10 @@ main = do
   putStrLn("----------------------------------")
 
 
+  let gdef5 :: Gdef
+      gdef5 = FuncGdef {ident=Ident "myfunc", params=[], retTy=IntTy, bodyExpr=IfExpr (LitExpr $ BoolLit True) (LitExpr $ IntLit 5656) (LitExpr $ IntLit 767)}
+  let Right mod4 = gdefsToModule [gdef5]
+  toLLVM mod4
+  putStrLn("----------------------------------")
+
+
