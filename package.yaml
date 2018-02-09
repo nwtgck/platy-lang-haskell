@@ -36,6 +36,7 @@ executables:
     dependencies:
 #    - platy-lang
      - mtl
+     - containers
      - bytestring
      - text
      - here

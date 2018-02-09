@@ -15,6 +15,8 @@ import qualified Data.ByteString.Char8 as BS
 import Data.String      (IsString(..))
 import Data.ByteString.Short
 import qualified Data.Text.Lazy.IO as TIO
+import qualified Data.Map as Map
+import Data.Map (Map)
 
 import qualified LLVM.AST as AST
 import LLVM.AST( Named( (:=) ) )
@@ -46,7 +48,7 @@ data Lit =
 
 -- | Identifier
 data Ident = Ident String
-  deriving (Show)
+  deriving (Show, Eq, Ord)
 
 -- | Type
 data Ty =
@@ -102,11 +104,20 @@ exprToLLVMType (ApplyExpr{})       = undefined -- TODO impl
 exprToLLVMType (LetExpr{inExpr})   = exprToLLVMType inExpr
 
 
+data IdentInfo =
+  VarIdentInfo  {ty :: Ty, globalPtrName :: AST.Name} |
+  FuncIdentInfo {retTy :: Ty, funcName :: AST.Name}
+  deriving (Show)
+
+type VarTable = Map Ident IdentInfo
 
 data ExprCodegenEnv =
  ExprCodegenEnv {
-   basicBlocks :: [AST.Global.BasicBlock]
- , count       :: Int
+   basicBlocks    :: [AST.Global.BasicBlock]
+ , stackedInstrs  :: [AST.Named AST.Instruction]
+ , globalVarTable :: VarTable
+ , localVarTable  :: VarTable
+ , count          :: Int
  }
  deriving (Show)
 
@@ -132,16 +143,61 @@ litToOperand (UnitLit)    = AST.ConstantOperand AST.Constant.Int {AST.Constant.i
 
 -- | Add a basic block
 addBasicBlock :: AST.Global.BasicBlock -> ExprCodegen ()
-addBasicBlock bb = do
+addBasicBlock _bb = do
+  -- Extract basicBlock fields
+  let AST.Global.BasicBlock name instrs terminator = _bb
+  -- Get stacked instructions
+  sInstrs <- gets stackedInstrs
+  -- Create a basic block with stacked instructions
+  let bb = AST.Global.BasicBlock name (sInstrs ++ instrs) terminator
+  -- Clear stacked instructions
+  modify (\env -> env{stackedInstrs=[]})
   -- Get current basic blocks
   bbs <- gets basicBlocks
   -- Add a basic block
-  modify (\env -> env {basicBlocks = bbs++[bb]})
+  modify (\env -> env {basicBlocks = bbs++[bb]}) -- TODO[Refactor]: Get basicBlocks by extracting from env
 
+
+-- | Stack an instruction
+stackInstruction :: Named AST.Instruction -> ExprCodegen ()
+stackInstruction instr = do
+  modify (\env@ExprCodegenEnv{stackedInstrs} -> env{stackedInstrs=stackedInstrs++[instr]})
 
 -- TODO: Impl
 exprToExprCodegen :: Expr -> ExprCodegen AST.Operand
 exprToExprCodegen (LitExpr lit) = return (litToOperand lit)
+exprToExprCodegen (IdentExpr ident) = do
+  lVarTable <- gets localVarTable
+  gVarTable <- gets globalVarTable
+
+  -- TODO: Find in lVarTable too
+
+  -- TODO: Not exahuastive
+  let Just (VarIdentInfo{ty, globalPtrName}) = Map.lookup ident gVarTable
+
+
+
+  let llvmTy    = tyToLLVMTy ty
+      llvmPtrTy = AST.Type.ptr llvmTy
+
+
+  -- Get fresh count for prefix of loaded value of global variable
+  freshCount <- getFreshCount
+
+
+  let loadedGVarName = AST.Name (strToShort [Here.i|$$global${freshCount}|])
+  let instr1 = [Quote.LLVM.lli| load $type:llvmPtrTy $gid:globalPtrName |]
+
+  stackInstruction (loadedGVarName := instr1)
+
+
+--  let instr2 = [Quote.LLVM.lli| $id:loadedGVarName = load $type:llvmPtrTy $gid:globalPtrName |]
+
+
+  return $ AST.LocalReference llvmTy loadedGVarName
+
+
+
 exprToExprCodegen (IfExpr {condExpr, thenExpr, elseExpr}) = do
   -- Get fresh count for prefix of label
   freshCount <- getFreshCount
@@ -219,12 +275,15 @@ exprToExprCodegen (IfExpr {condExpr, thenExpr, elseExpr}) = do
 
 
 -- | Expr => Operand
-exprToOperandEither :: Expr -> Either ErrorType (AST.Operand, ExprCodegenEnv)
-exprToOperandEither expr = runStateT (runExprCodegen $ exprToExprCodegen expr) initEnv
+exprToOperandEither :: VarTable -> Expr -> Either ErrorType (AST.Operand, ExprCodegenEnv)
+exprToOperandEither globalVarTable expr = runStateT (runExprCodegen $ exprToExprCodegen expr) initEnv
   where
     initEnv = ExprCodegenEnv {
-                basicBlocks = []
-              , count       = 0
+                basicBlocks    = []
+              , stackedInstrs  = []
+              , globalVarTable = globalVarTable
+              , localVarTable  = Map.empty
+              , count          = 0
               }
 
 -- (for preventing "\22" in [Here.i])
@@ -254,10 +313,18 @@ addInitFunc initFunc = do
   funcs <- gets globalInitFuncs
   modify (\env -> env{globalInitFuncs=funcs++[initFunc]})
 
+-- | Generate global ptr name
+genGlobalVarName :: Ident -> AST.Name
+genGlobalVarName (Ident name) = AST.Name (strToShort [Here.i|${name}/ptr|])
+
+-- | Generate function name
+genFuncName :: Ident -> AST.Name
+genFuncName (Ident name) = AST.Name (strToShort name)
+
 -- Gdef => GdefCodegen
-gdefToGdefCodegen :: Gdef -> GdefCodegen ()
-gdefToGdefCodegen (LetGdef (Bind {ident=Ident name, ty, bodyExpr})) = do
-  let globalName   = AST.Name (strToShort [Here.i|${name}/ptr|])
+gdefToGdefCodegen :: VarTable -> Gdef -> GdefCodegen ()
+gdefToGdefCodegen globalVarTable (LetGdef (Bind {ident=ident@(Ident name), ty, bodyExpr})) = do
+  let globalName   = genGlobalVarName ident
       initFuncName = AST.Name (strToShort [Here.i|$$PLATY_INIT/${name}|])
       llvmTy       = tyToLLVMTy ty
       llvmPtrTy    = AST.Type.ptr llvmTy
@@ -265,31 +332,38 @@ gdefToGdefCodegen (LetGdef (Bind {ident=Ident name, ty, bodyExpr})) = do
   -- Add the definition
   addDefinition globalDef
 
-  case exprToOperandEither bodyExpr of
-    Right (bodyOperand, ExprCodegenEnv{basicBlocks}) -> do
-      -- NOTE: Should avoid to using PLATY_GLOBAL_RES if an user uses this name then fail
-      let funcDef   =
-           -- (this if is for just avoid empty $bbs)
-           if Prelude.null basicBlocks
-            then
-              [Quote.LLVM.lldef|
-                define void $gid:initFuncName(){
-                entry:
-                  %PLATY_GLOBAL_RES = $opr:bodyOperand
-                  store $type:llvmTy %PLATY_GLOBAL_RES, $type:llvmPtrTy $gid:globalName
-                  ret void
-                }
-              |]
-            else
-             [Quote.LLVM.lldef|
-              define void $gid:initFuncName(){
-              entry:
-                $bbs:basicBlocks
-                ;%PLATY_GLOBAL_RES = $opr:bodyOperand
-                ;store $type:llvmTy %PLATY_GLOBAL_RES, $type:llvmPtrTy $gid:globalName
-                ret void
-              }
-            |]
+  case exprToOperandEither globalVarTable bodyExpr of
+    Right (bodyOperand, ExprCodegenEnv{basicBlocks, stackedInstrs}) -> do --TODO[Refactor]: Use lift in Control.Monad.Trans.Class
+
+      let funcDef = AST.GlobalDefinition AST.Global.functionDefaults
+            { AST.Global.name        = initFuncName
+            , AST.Global.parameters  =([], False)
+            , AST.Global.returnType  = AST.Type.void
+            , AST.Global.basicBlocks = basicBlocks ++ [restBasicBlock]
+            }
+            where
+              restBasicBlock = AST.Global.BasicBlock
+                  (AST.Name "nextblock") -- FIXME: Shouldn't use "nextblock" ("nextblock" is determined by llvm-hs-quote)
+                  -- NOTE: stackedInstrs added
+                  (stackedInstrs ++ [
+                    AST.Name "PLATY_GLOBAL_RES" := [Quote.LLVM.lli| $opr:bodyOperand |],
+                    AST.Do [Quote.LLVM.lli| store $type:llvmTy %PLATY_GLOBAL_RES, $type:llvmPtrTy $gid:globalName |]
+                  ])
+                  (AST.Do [Quote.LLVM.llt| ret void |])
+
+      -- This comment is for the future fundDef
+      -- (Issue about $instrs: https://github.com/llvm-hs/llvm-hs-quote/issues/16)
+      -- (Issue about Empty Basic Block: https://github.com/llvm-hs/llvm-hs-quote/issues/17)
+--       [Quote.LLVM.lldef|
+--        define void $gid:initFuncName(){
+--        entry:
+--          $bbs:basicBlocks
+--          $instrs:stackedInstrs
+--          %PLATY_GLOBAL_RES = $opr:bodyOperand
+--          store $type:llvmTy %PLATY_GLOBAL_RES, $type:llvmPtrTy $gid:globalName
+--          ret void
+--        }
+--      |]
       -- Add the init-function
       addInitFunc funcDef
 
@@ -310,10 +384,11 @@ gdefToGdefCodegen (LetGdef (Bind {ident=Ident name, ty, bodyExpr})) = do
       return ()
 
     Left error -> fail error
-gdefToGdefCodegen (FuncGdef {ident=Ident name, params, retTy, bodyExpr}) = do
-  case exprToOperandEither bodyExpr of
-      Right (bodyOperand, ExprCodegenEnv{basicBlocks}) -> do
-        let funcName  = AST.Name (strToShort name)
+gdefToGdefCodegen globalVarTable (FuncGdef {ident=ident@(Ident name), params, retTy, bodyExpr}) = do
+  case exprToOperandEither globalVarTable bodyExpr of
+      Right (bodyOperand, ExprCodegenEnv{basicBlocks, stackedInstrs}) -> do -- TODO[Refactor]: Use stackedInstrs
+        -- TODO: Use lift in Control.Monad.Trans.Class
+        let funcName  = genFuncName ident
             llvmRetTy = tyToLLVMTy retTy
 
         -- NOTE: Should avoid to using PLATY_GLOBAL_RES if an user uses this name then fail
@@ -353,7 +428,10 @@ gdefsToModule gdefs = do
                   definitions         = []
                 , globalInitFuncs     = []
                 }
-  GdefCodegenEnv{definitions, globalInitFuncs} <- execStateT (runGdefCodegen $ mapM_ gdefToGdefCodegen gdefs) initEnv
+      f (LetGdef (Bind {ident, ty})) = (ident, VarIdentInfo {ty=ty, globalPtrName=genGlobalVarName ident})
+      f (FuncGdef {ident, retTy})    = (ident, FuncIdentInfo {retTy=retTy, funcName=genFuncName ident})
+      globalVarMap = Map.fromList (fmap f gdefs)
+  GdefCodegenEnv{definitions, globalInitFuncs} <- execStateT (runGdefCodegen $ mapM_ (gdefToGdefCodegen globalVarMap) gdefs) initEnv
 
   let globalCtorsDef = [Quote.LLVM.lldef|
    @llvm.global_ctors = appending global [1 x { i32, void ()*, i8* }]
@@ -390,12 +468,12 @@ toLLVM mod = Context.withContext $ \ctx -> do
 main :: IO ()
 main = do
   let expr1 = LitExpr (IntLit 1515)
-  let Right (operand1, exprCodeEnv1) = exprToOperandEither expr1
+  let Right (operand1, exprCodeEnv1) = exprToOperandEither Map.empty expr1
   print operand1
   print exprCodeEnv1
 
   let expr2 = IfExpr (LitExpr $ BoolLit True) (LitExpr $ IntLit 81818) (LitExpr $ IntLit 23232)
-  let Right (operand2, exprCodeEnv2) = exprToOperandEither expr2
+  let Right (operand2, exprCodeEnv2) = exprToOperandEither Map.empty expr2
   print operand2
   print exprCodeEnv2
 
@@ -432,5 +510,13 @@ main = do
   let Right mod4 = gdefsToModule [gdef5]
   toLLVM mod4
   putStrLn("----------------------------------")
+
+
+  let gdef6 = LetGdef {bind=Bind {ident=Ident "myint", ty=IntTy, bodyExpr=LitExpr $ IntLit 8877}}
+  let gdef7 = LetGdef {bind=Bind {ident=Ident "myint2", ty=IntTy, bodyExpr=IdentExpr $ Ident "myint"}}
+  let Right mod1 = gdefsToModule [gdef6, gdef7]
+  toLLVM mod1
+  putStrLn("----------------------------------")
+
 
 
