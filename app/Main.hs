@@ -115,11 +115,11 @@ type VarTable = Map Ident IdentInfo
 
 data ExprCodegenEnv =
  ExprCodegenEnv {
-   basicBlocks    :: [AST.Global.BasicBlock]
- , stackedInstrs  :: [AST.Named AST.Instruction]
- , globalVarTable :: VarTable
- , localVarTable  :: VarTable
- , count          :: Int
+   basicBlocks     :: [AST.Global.BasicBlock]
+ , stackedInstrs   :: [AST.Named AST.Instruction]
+ , globalVarTable  :: VarTable
+ , localVarTables  :: [VarTable]
+ , count           :: Int
  }
  deriving (Show)
 
@@ -165,14 +165,19 @@ stackInstruction :: Named AST.Instruction -> ExprCodegen ()
 stackInstruction instr = do
   modify (\env@ExprCodegenEnv{stackedInstrs} -> env{stackedInstrs=stackedInstrs++[instr]})
 
+-- | Look up local variable tables
+lookupLVarTables :: Ident -> [VarTable] -> Maybe IdentInfo
+lookupLVarTables _     []     = Nothing
+lookupLVarTables ident (v:vs) = Map.lookup ident v <|> lookupLVarTables ident vs
+
 -- TODO: Impl
 exprToExprCodegen :: Expr -> ExprCodegen AST.Operand
 exprToExprCodegen (LitExpr lit) = return (litToOperand lit)
 exprToExprCodegen (IdentExpr ident) = do
-  lVarTable <- gets localVarTable
-  gVarTable <- gets globalVarTable
+  lVarTables <- gets localVarTables
+  gVarTable  <- gets globalVarTable
   -- TODO: Not exahuastive
-  let Just (VarIdentInfo{ty, globalPtrName}) = Map.lookup ident lVarTable <|> Map.lookup ident gVarTable
+  let Just (VarIdentInfo{ty, globalPtrName}) = lookupLVarTables ident lVarTables <|> Map.lookup ident gVarTable
   let llvmTy    = tyToLLVMTy ty
       llvmPtrTy = AST.Type.ptr llvmTy
   -- Get fresh count for prefix of loaded value of global variable
@@ -266,7 +271,7 @@ exprToOperandEither globalVarTable expr = runStateT (runExprCodegen $ exprToExpr
                 basicBlocks    = []
               , stackedInstrs  = []
               , globalVarTable = globalVarTable
-              , localVarTable  = Map.empty
+              , localVarTables = []
               , count          = 0
               }
 
