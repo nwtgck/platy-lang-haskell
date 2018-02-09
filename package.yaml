@@ -36,8 +36,11 @@ executables:
     dependencies:
 #    - platy-lang
      - mtl
+     - containers
      - bytestring
      - text
+     - transformers
+     - MissingH
      - here
      - interpolate
      - llvm-hs
