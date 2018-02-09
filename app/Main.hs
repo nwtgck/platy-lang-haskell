@@ -19,6 +19,7 @@ import qualified Data.Map as Map
 import Data.Map (Map)
 import qualified Control.Monad.Trans as Monad.Trans
 import Control.Applicative ((<|>))
+import qualified Data.Either.Utils as Either.Utils
 
 import qualified LLVM.AST as AST
 import LLVM.AST( Named( (:=) ) )
@@ -173,20 +174,30 @@ lookupLVarTables ident (v:vs) = Map.lookup ident v <|> lookupLVarTables ident vs
 -- TODO: Impl
 exprToExprCodegen :: Expr -> ExprCodegen AST.Operand
 exprToExprCodegen (LitExpr lit) = return (litToOperand lit)
-exprToExprCodegen (IdentExpr ident) = do
+exprToExprCodegen (IdentExpr ident@(Ident name)) = do
+  -- Get local variable tables
   lVarTables <- gets localVarTables
+  -- Get global variable table
   gVarTable  <- gets globalVarTable
-  -- TODO: Not exahuastive
-  let Just (VarIdentInfo{ty, globalPtrName}) = lookupLVarTables ident lVarTables <|> Map.lookup ident gVarTable
-  let llvmTy    = tyToLLVMTy ty
-      llvmPtrTy = AST.Type.ptr llvmTy
-  -- Get fresh count for prefix of loaded value of global variable
-  freshCount <- getFreshCount
-  let loadedGVarName = AST.Name (strToShort [Here.i|$$global${freshCount}|])
-  let callInstr = [Quote.LLVM.lli| load $type:llvmPtrTy $gid:globalPtrName |]
-  -- Stack the call instruction
-  stackInstruction (loadedGVarName := callInstr)
-  return $ AST.LocalReference llvmTy loadedGVarName
+  -- Find ident from tables
+  let varInfoMaybe = lookupLVarTables ident lVarTables <|> Map.lookup ident gVarTable
+      notFoundMsg  = [Here.i| Identifier '${name}' is not found|]
+  -- Get identifier information
+  indentInfo <- ExprCodegen $ Monad.Trans.lift $ Either.Utils.maybeToEither notFoundMsg varInfoMaybe
+  case indentInfo of
+    VarIdentInfo{ty, globalPtrName} -> do
+      let llvmTy    = tyToLLVMTy ty
+          llvmPtrTy = AST.Type.ptr llvmTy
+      -- Get fresh count for prefix of loaded value of global variable
+      freshCount <- getFreshCount
+      let loadedGVarName = AST.Name (strToShort [Here.i|$$global${freshCount}|])
+      let callInstr = [Quote.LLVM.lli| load $type:llvmPtrTy $gid:globalPtrName |]
+      -- Stack the call instruction
+      stackInstruction (loadedGVarName := callInstr)
+      return $ AST.LocalReference llvmTy loadedGVarName
+
+    FuncIdentInfo{} -> undefined -- TODO: impl
+
 exprToExprCodegen (IfExpr {condExpr, thenExpr, elseExpr}) = do
   -- Get fresh count for prefix of label
   freshCount <- getFreshCount
