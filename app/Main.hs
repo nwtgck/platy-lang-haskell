@@ -170,35 +170,18 @@ exprToExprCodegen (LitExpr lit) = return (litToOperand lit)
 exprToExprCodegen (IdentExpr ident) = do
   lVarTable <- gets localVarTable
   gVarTable <- gets globalVarTable
-
   -- TODO: Find in lVarTable too
-
   -- TODO: Not exahuastive
   let Just (VarIdentInfo{ty, globalPtrName}) = Map.lookup ident gVarTable
-
-
-
   let llvmTy    = tyToLLVMTy ty
       llvmPtrTy = AST.Type.ptr llvmTy
-
-
   -- Get fresh count for prefix of loaded value of global variable
   freshCount <- getFreshCount
-
-
   let loadedGVarName = AST.Name (strToShort [Here.i|$$global${freshCount}|])
-  let instr1 = [Quote.LLVM.lli| load $type:llvmPtrTy $gid:globalPtrName |]
-
-  stackInstruction (loadedGVarName := instr1)
-
-
---  let instr2 = [Quote.LLVM.lli| $id:loadedGVarName = load $type:llvmPtrTy $gid:globalPtrName |]
-
-
+  let callInstr = [Quote.LLVM.lli| load $type:llvmPtrTy $gid:globalPtrName |]
+  -- Stack the call instruction
+  stackInstruction (loadedGVarName := callInstr)
   return $ AST.LocalReference llvmTy loadedGVarName
-
-
-
 exprToExprCodegen (IfExpr {condExpr, thenExpr, elseExpr}) = do
   -- Get fresh count for prefix of label
   freshCount <- getFreshCount
