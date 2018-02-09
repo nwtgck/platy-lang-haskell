@@ -335,6 +335,7 @@ gdefToGdefCodegen globalVarTable (LetGdef (Bind {ident=ident@(Ident name), ty, b
   case exprToOperandEither globalVarTable bodyExpr of
     Right (bodyOperand, ExprCodegenEnv{basicBlocks, stackedInstrs}) -> do --TODO[Refactor]: Use lift in Control.Monad.Trans.Class
 
+      -- NOTE: Should avoid to using PLATY_GLOBAL_RES if an user uses this name then fail
       let funcDef = AST.GlobalDefinition AST.Global.functionDefaults
             { AST.Global.name        = initFuncName
             , AST.Global.parameters  =([], False)
@@ -351,7 +352,7 @@ gdefToGdefCodegen globalVarTable (LetGdef (Bind {ident=ident@(Ident name), ty, b
                   ])
                   (AST.Do [Quote.LLVM.llt| ret void |])
 
-      -- This comment is for the future fundDef
+      -- (This comment is for the future fundDef)
       -- (Issue about $instrs: https://github.com/llvm-hs/llvm-hs-quote/issues/16)
       -- (Issue about Empty Basic Block: https://github.com/llvm-hs/llvm-hs-quote/issues/17)
 --       [Quote.LLVM.lldef|
@@ -386,32 +387,36 @@ gdefToGdefCodegen globalVarTable (LetGdef (Bind {ident=ident@(Ident name), ty, b
     Left error -> fail error
 gdefToGdefCodegen globalVarTable (FuncGdef {ident=ident@(Ident name), params, retTy, bodyExpr}) = do
   case exprToOperandEither globalVarTable bodyExpr of
-      Right (bodyOperand, ExprCodegenEnv{basicBlocks, stackedInstrs}) -> do -- TODO[Refactor]: Use stackedInstrs
-        -- TODO: Use lift in Control.Monad.Trans.Class
+      Right (bodyOperand, ExprCodegenEnv{basicBlocks, stackedInstrs}) -> do
+        -- TODO[Refactor]: Use lift in Control.Monad.Trans.Class
         let funcName  = genFuncName ident
             llvmRetTy = tyToLLVMTy retTy
 
         -- NOTE: Should avoid to using PLATY_GLOBAL_RES if an user uses this name then fail
-        let funcDef   =
-             -- (this if is for just avoid empty $bbs)
-             if Prelude.null basicBlocks
-              then
-                [Quote.LLVM.lldef|
-                  define $type:llvmRetTy $gid:funcName(){
-                  entry:
-                    %PLATY_GLOBAL_RES = $opr:bodyOperand
-                    ret $type:llvmRetTy %PLATY_GLOBAL_RES
-                  }
-                |]
-              else
-               [Quote.LLVM.lldef|
-                define $type:llvmRetTy $gid:funcName(){
-                entry:
-                  $bbs:basicBlocks
-                  %PLATY_GLOBAL_RES = $opr:bodyOperand
-                  ret $type:llvmRetTy %PLATY_GLOBAL_RES
-                }
-              |]
+        let funcDef = AST.GlobalDefinition AST.Global.functionDefaults
+              { AST.Global.name        = funcName
+              , AST.Global.parameters  =([], False)
+              , AST.Global.returnType  = llvmRetTy
+              , AST.Global.basicBlocks = basicBlocks ++ [restBasicBlock]
+              }
+              where
+                restBasicBlock = AST.Global.BasicBlock
+                    (AST.Name "nextblock") -- FIXME: Shouldn't use "nextblock" ("nextblock" is determined by llvm-hs-quote)
+                    -- NOTE: stackedInstrs added
+                    (stackedInstrs ++ [
+                      AST.Name "PLATY_GLOBAL_RES" := [Quote.LLVM.lli| $opr:bodyOperand |]
+                    ])
+                    (AST.Do [Quote.LLVM.llt| ret $type:llvmRetTy %PLATY_GLOBAL_RES |])
+
+        -- (This comment is for the future fundDef)
+--         [Quote.LLVM.lldef|
+--          define $type:llvmRetTy $gid:funcName(){
+--          entry:
+--            $bbs:basicBlocks
+--            %PLATY_GLOBAL_RES = $opr:bodyOperand
+--            ret $type:llvmRetTy %PLATY_GLOBAL_RES
+--          }
+--        |]
         -- Add to the definitions
         addDefinition funcDef
 
