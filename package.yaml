@@ -39,6 +39,7 @@ executables:
      - containers
      - bytestring
      - text
+     - transformers
      - here
      - interpolate
      - llvm-hs
