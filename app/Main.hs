@@ -18,6 +18,7 @@ import qualified Data.Text.Lazy.IO as TIO
 import qualified Data.Map as Map
 import Data.Map (Map)
 import qualified Control.Monad.Trans as Monad.Trans
+import Control.Applicative ((<|>))
 
 import qualified LLVM.AST as AST
 import LLVM.AST( Named( (:=) ) )
@@ -170,9 +171,8 @@ exprToExprCodegen (LitExpr lit) = return (litToOperand lit)
 exprToExprCodegen (IdentExpr ident) = do
   lVarTable <- gets localVarTable
   gVarTable <- gets globalVarTable
-  -- TODO: Find in lVarTable too
   -- TODO: Not exahuastive
-  let Just (VarIdentInfo{ty, globalPtrName}) = Map.lookup ident gVarTable
+  let Just (VarIdentInfo{ty, globalPtrName}) = Map.lookup ident lVarTable <|> Map.lookup ident gVarTable
   let llvmTy    = tyToLLVMTy ty
       llvmPtrTy = AST.Type.ptr llvmTy
   -- Get fresh count for prefix of loaded value of global variable
