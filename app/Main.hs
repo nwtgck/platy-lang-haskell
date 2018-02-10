@@ -173,6 +173,17 @@ lookupLVarTables :: Ident -> [VarTable] -> Maybe IdentInfo
 lookupLVarTables _     []     = Nothing
 lookupLVarTables ident (v:vs) = Map.lookup ident v <|> lookupLVarTables ident vs
 
+
+-- | Push & Pop a local variable map
+withLVarTable :: Map Ident IdentInfo -> ExprCodegen a -> ExprCodegen a
+withLVarTable lVarMap f = do
+  -- Push `lVarMap` to  `localVarTables`
+  modify (\env@ExprCodegenEnv{localVarTables} -> env{localVarTables=lVarMap:localVarTables})
+  ret <- f
+  -- Pop lVarMap` from  `localVarTables`
+  modify (\env@ExprCodegenEnv{localVarTables=_:rest} -> env{localVarTables=rest})
+  return ret
+
 -- TODO: Impl
 exprToExprCodegen :: Expr -> ExprCodegen AST.Operand
 exprToExprCodegen (LitExpr lit) = return (litToOperand lit)
@@ -210,27 +221,21 @@ exprToExprCodegen (LetExpr {binds, inExpr}) = do
   -- TODO: Rename better
   let f :: Map Ident IdentInfo -> Bind -> ExprCodegen (Map Ident IdentInfo)
       f lVarMap (Bind {ident=ident@(Ident name), ty, bodyExpr}) = do
-        -- Push `lVarMap` to  `localVarTables`
-        modify (\env@ExprCodegenEnv{localVarTables} -> env{localVarTables=lVarMap:localVarTables})
-        -- Eval bodyExpr to operand
-        bodyOpr <- exprToExprCodegen bodyExpr
-        -- Local variable name
-        let localName = AST.Name (strToShort [Here.i|$$local${prefixNumber}/${name}|])
-        let newlVarMap = Map.insert ident (LVarIdentInfo{ty=ty, localName=localName}) lVarMap
-        -- Stack an instruction of local definition
-        stackInstruction (localName := [Quote.LLVM.lli| $opr:bodyOpr |])
-        -- Pop from localVarTables
-        modify (\env@ExprCodegenEnv{localVarTables=_:lVarTables} -> env{localVarTables=lVarTables})
-        return newlVarMap
+        withLVarTable lVarMap $ do -- NOTE: push & pop (lVarMap)
+          -- Eval bodyExpr to operand
+          bodyOpr <- exprToExprCodegen bodyExpr
+          -- Local variable name
+          let localName = AST.Name (strToShort [Here.i|$$local${prefixNumber}/${name}|])
+          let newlVarMap = Map.insert ident (LVarIdentInfo{ty=ty, localName=localName}) lVarMap
+          -- Stack an instruction of local definition
+          stackInstruction (localName := [Quote.LLVM.lli| $opr:bodyOpr |])
+          return newlVarMap
 
   -- Define all binds
   localVariableMap <- Foldable.foldlM f (Map.empty :: Map Ident IdentInfo) binds
-  -- Push `lVarMap` to  `localVarTables`
-  modify (\env@ExprCodegenEnv{localVarTables} -> env{localVarTables=localVariableMap:localVarTables})
-  -- Eval inExpr of local `let` to operand
-  inOpr <- exprToExprCodegen inExpr
-  -- Pop from localVarTables
-  modify (\env@ExprCodegenEnv{localVarTables=_:lVarTables} -> env{localVarTables=lVarTables})
+  inOpr <- withLVarTable localVariableMap $ do -- NOTE: push & pop (localVariableMap)
+    -- Eval inExpr of local `let` to operand
+    exprToExprCodegen inExpr
 
   return inOpr
 
