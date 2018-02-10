@@ -62,5 +62,17 @@ tests:
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
-    dependencies: []
-#    - platy-lang
+    dependencies:
+     - platy-lang
+     - hspec
+     - QuickCheck
+     - containers
+     - bytestring
+     - text
+     - temporary
+     - process
+     - here
+     - llvm-hs
+     - llvm-hs-pure
+     - llvm-hs-pretty
+

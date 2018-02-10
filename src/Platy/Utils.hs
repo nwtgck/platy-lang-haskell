@@ -6,6 +6,7 @@ import qualified Data.ByteString.Char8 as BS
 import qualified LLVM.AST as AST
 import qualified LLVM.Module as Module
 import qualified LLVM.Context as Context
+import qualified LLVM.Target as Target
 
 -- (for preventing "\22" in [Here.i])
 strToShort :: String -> ShortByteString
@@ -17,3 +18,9 @@ toLLVM :: AST.Module -> IO ()
 toLLVM mod = Context.withContext $ \ctx -> do
   llvm <- Module.withModuleFromAST ctx mod Module.moduleLLVMAssembly
   BS.putStrLn llvm
+
+-- | Module to object byte string
+toObjByteString :: AST.Module -> IO BS.ByteString
+toObjByteString mod = Context.withContext $ \ctx ->
+  Target.withHostTargetMachine $ \target ->
+      Module.withModuleFromAST ctx mod (Module.moduleObject target)

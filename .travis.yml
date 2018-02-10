@@ -50,3 +50,5 @@ script:
 - stack build
 # ==== THIS IS FOR JUST WORKING TEST ====
 - stack exec platy-lang-exe
+# Test
+- stack test
