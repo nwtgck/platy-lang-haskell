@@ -551,8 +551,9 @@ gdefsToModule gdefs = do
   -- TODO: `stdlibDefs` should move to stdlib for Platy
   let stdlibDefs = [intFormatDef, printfDef, printIntDef]
         where
+          intFormatName = AST.Name "$$PLATY/int_format_str"
           intFormatDef = [Quote.LLVM.lldef|
-            @int_format_str = private constant [4 x i8] c"%d\0A\00"
+            $gid:intFormatName = private constant [4 x i8] c"%d\0A\00"
           |]
           intFormatTy = AST.Type.ptr AST.ArrayType {
                           AST.nArrayElements = 4
@@ -563,14 +564,15 @@ gdefsToModule gdefs = do
           |]
 
 
-          printfParamName = AST.Name "value"
-          chPtrName       = AST.Name "ch_ptr"
-          llvmUnitTy      = tyToLLVMTy UnitTy
-          llvmUnitValue   = litToOperand UnitLit
+          printIntParamName = AST.Name "value"
+          printIntParamTy   = tyToLLVMTy IntTy
+          chPtrName         = AST.Name "ch_ptr"
+          llvmUnitTy        = tyToLLVMTy UnitTy
+          llvmUnitValue     = litToOperand UnitLit
 
           -- NOTE: `i1` is Unit Type
           printIntDef = [Quote.LLVM.lldef|
-            define $type:llvmUnitTy @print-int(i32 $id:printfParamName){
+            define $type:llvmUnitTy @print-int($type:printIntParamTy $id:printIntParamName){
             entry:
                 $id:chPtrName = $instr:gepInstr
                 $instr:callPrintfInstr
@@ -587,7 +589,7 @@ gdefsToModule gdefs = do
 --              }
               gepInstr = Left AST.GetElementPtr {
                              AST.inBounds = False,
-                             AST.address  = AST.ConstantOperand $ AST.Constant.GlobalReference intFormatTy (AST.Name "int_format_str"),
+                             AST.address  = AST.ConstantOperand $ AST.Constant.GlobalReference intFormatTy (intFormatName),
                              AST.indices  = let i64Zero = AST.ConstantOperand AST.Constant.Int {AST.Constant.integerBits=64, AST.Constant.integerValue=0} in [i64Zero, i64Zero],
                              AST.metadata = []
                            }
@@ -604,7 +606,7 @@ gdefsToModule gdefs = do
                                   AST.callingConvention  = AST.CallingConvention.C,
                                   AST.returnAttributes   = [],
                                   AST.function           = Right $ AST.ConstantOperand $ AST.Constant.GlobalReference printfTy (AST.Name "printf"),
-                                  AST.arguments          = [(AST.LocalReference (AST.Type.ptr AST.Type.i8) (chPtrName), []), (AST.LocalReference (AST.Type.i32) (printfParamName), [])],
+                                  AST.arguments          = [(AST.LocalReference (AST.Type.ptr AST.Type.i8) (chPtrName), []), (AST.LocalReference (printIntParamTy) (printIntParamName), [])],
                                   AST.functionAttributes = [],
                                   AST.metadata           = []
                                 }
