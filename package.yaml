@@ -22,8 +22,21 @@ description:         Please see the README on Github at <https://github.com/nwtg
 dependencies:
 - base >= 4.7 && < 5
 
-#library:
-#  source-dirs: src
+library:
+  source-dirs: src
+  dependencies:
+   - mtl
+   - containers
+   - bytestring
+   - text
+   - transformers
+   - MissingH
+   - here
+   - interpolate
+   - llvm-hs
+   - llvm-hs-pure
+   - llvm-hs-pretty
+   - llvm-hs-quote
 
 executables:
   platy-lang-exe:
@@ -34,7 +47,7 @@ executables:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-#    - platy-lang
+     - platy-lang
      - mtl
      - containers
      - bytestring
