@@ -30,6 +30,8 @@ import qualified LLVM.Context as Context
 import qualified LLVM.AST.Type as AST.Type
 import qualified LLVM.AST.Constant as AST.Constant
 import qualified LLVM.AST.Global as AST.Global
+import qualified LLVM.AST.AddrSpace as AST.AddrSpace
+import qualified LLVM.AST.CallingConvention as AST.CallingConvention
 import qualified LLVM.Pretty
 
 
@@ -74,7 +76,7 @@ data Expr =
   LitExpr Lit |
   IdentExpr Ident |
   IfExpr {condExpr :: Expr, thenExpr :: Expr, elseExpr :: Expr} |
-  ApplyExpr {calleeExpr :: Expr, params :: [Expr]} | -- NOTE: params can be Expr instead of [Expr] in the future
+  ApplyExpr {calleeIdent :: Ident, params :: [Expr]} | -- NOTE: params can be Expr instead of [Expr] in the future -- TODO: Rename params to args
   LetExpr {binds :: [Bind], inExpr :: Expr}
   deriving (Show)
 
@@ -114,7 +116,7 @@ exprToLLVMType (LetExpr{inExpr})   = exprToLLVMType inExpr
 data IdentInfo =
   GVarIdentInfo {ty :: Ty, globalPtrName :: AST.Name} |
   LVarIdentInfo {ty :: Ty, localName :: AST.Name} |
-  FuncIdentInfo {retTy :: Ty, funcName :: AST.Name}
+  FuncIdentInfo {retTy :: Ty, paramTys :: [Ty], funcName :: AST.Name}
   deriving (Show)
 
 type VarTable = Map Ident IdentInfo
@@ -213,7 +215,7 @@ exprToExprCodegen (IdentExpr ident@(Ident name)) = do
       let llvmTy    = tyToLLVMTy ty
       return $ AST.LocalReference llvmTy localName
 
-    FuncIdentInfo{} -> undefined -- TODO: impl
+    FuncIdentInfo{} -> fail [Here.i|Unexpected function name '${name}'|]
 exprToExprCodegen (LetExpr {binds, inExpr}) = do
   -- Get fresh prefix number
   prefixNumber <- getFreshCount
@@ -238,6 +240,51 @@ exprToExprCodegen (LetExpr {binds, inExpr}) = do
     exprToExprCodegen inExpr
 
   return inOpr
+exprToExprCodegen (ApplyExpr {calleeIdent=calleeIdent@(Ident calleeName), params}) = do
+  -- Get fresh prefix number
+  prefixNumber <- getFreshCount
+  -- Get global variable table
+  gVarTable <- gets globalVarTable
+  -- Result name
+  let resName = AST.Name (strToShort [Here.i|$$apply_res${prefixNumber}|])
+  -- Find ident from tables
+  let varInfoMaybe = Map.lookup calleeIdent gVarTable
+      notFoundMsg  = [Here.i| Callee identifier '${calleeName}' not found|]
+  -- Get identifier information
+  identInfo <- ExprCodegen $ Monad.Trans.lift $ Either.Utils.maybeToEither notFoundMsg varInfoMaybe
+  case identInfo of
+    FuncIdentInfo{retTy, paramTys, funcName} -> do
+      -- Get type
+      let llvmRetTy = tyToLLVMTy retTy
+      -- Create function LLVM type
+      let llvmFuncTy = AST.Type.ptr
+                         AST.FunctionType {
+                             AST.resultType    = llvmRetTy
+                           , AST.argumentTypes = fmap tyToLLVMTy paramTys
+                           , AST.isVarArg      = False
+                           }
+
+      -- Eval args to operands
+      argumentOprs <- mapM exprToExprCodegen params
+
+      -- Get LLVM arguments
+      -- NOTE: [] may be hard code
+      let llvmArgs = fmap (\argExpr -> (argExpr, [])) argumentOprs
+
+      -- Call instruction
+      -- NOTE: Why llvm-hs-quote isn't used here? => Because llvm-has-quote doesn't have an antiquote for argument (Issue: https://github.com/llvm-hs/llvm-hs-quote/issues/18)
+      let callInst = resName := AST.Do AST.Call {
+                                  AST.tailCallKind       = Nothing,
+                                  AST.callingConvention  = AST.CallingConvention.C,
+                                  AST.returnAttributes   = [],
+                                  AST.function           = Right $ AST.ConstantOperand $ AST.Constant.GlobalReference llvmFuncTy funcName,
+                                  AST.arguments          = llvmArgs,
+                                  AST.functionAttributes = [],
+                                  AST.metadata           = []
+                                }
+
+      return $ AST.LocalReference llvmRetTy resName
+    _  -> fail ([Here.i|Should be function identifier |])
 
 exprToExprCodegen (IfExpr {condExpr, thenExpr, elseExpr}) = do
   -- Get fresh count for prefix of label
@@ -469,7 +516,7 @@ gdefsToModule gdefs = do
                 , globalInitFuncs     = []
                 }
       f (LetGdef (Bind {ident, ty})) = (ident, GVarIdentInfo {ty=ty, globalPtrName=genGlobalVarName ident})
-      f (FuncGdef {ident, retTy})    = (ident, FuncIdentInfo {retTy=retTy, funcName=genFuncName ident})
+      f (FuncGdef {ident, retTy, params})    = (ident, FuncIdentInfo {retTy=retTy, paramTys=[ty | Param {ty} <- params], funcName=genFuncName ident})
       globalVarMap = Map.fromList (fmap f gdefs)
   GdefCodegenEnv{definitions, globalInitFuncs} <- execStateT (runGdefCodegen $ mapM_ (gdefToGdefCodegen globalVarMap) gdefs) initEnv
 
