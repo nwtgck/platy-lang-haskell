@@ -13,21 +13,14 @@ import qualified Data.Text.Lazy.IO as TIO
 import qualified Data.Map as Map
 import Data.Map (Map)
 
-import qualified LLVM.AST as AST
-import qualified LLVM.Module as Module
-import qualified LLVM.Context as Context
 import qualified LLVM.Pretty
 
 import Debug.Trace
 
 import Platy.Datatypes
 import Platy.Codegen
+import Platy.Utils
 
-
-toLLVM :: AST.Module -> IO ()
-toLLVM mod = Context.withContext $ \ctx -> do
-  llvm <- Module.withModuleFromAST ctx mod Module.moduleLLVMAssembly
-  BS.putStrLn llvm
 
 main :: IO ()
 main = do

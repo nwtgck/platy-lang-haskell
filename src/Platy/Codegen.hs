@@ -11,9 +11,7 @@ import Control.Monad.State
 import qualified Data.Char
 import qualified Data.String.Here as Here
 import Control.Monad (mapM_)
-import qualified Data.ByteString.Char8 as BS
 import Data.String      (IsString(..))
-import Data.ByteString.Short
 import qualified Data.Map as Map
 import Data.Map (Map)
 import qualified Data.Foldable as Foldable
@@ -35,6 +33,7 @@ import qualified LLVM.AST.CallingConvention as AST.CallingConvention
 import Debug.Trace
 
 import Platy.Constants
+import Platy.Utils
 import Platy.Datatypes
 
 -- | Ty => LLVM Type
@@ -323,10 +322,6 @@ exprToOperandEither globalVarTable expr = runStateT (runExprCodegen $ exprToExpr
               , localVarTables = []
               , count          = 0
               }
-
--- (for preventing "\22" in [Here.i])
-strToShort :: String -> ShortByteString
-strToShort = (toShort . BS.pack)
 
 data GdefCodegenEnv =
  GdefCodegenEnv {
