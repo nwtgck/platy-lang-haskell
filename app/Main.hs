@@ -35,7 +35,10 @@ import qualified LLVM.Pretty
 import Debug.Trace
 
 -- ====== Global Language Settings ======
-nIntBits = 32
+nIntBits  = 32
+nCharBits = 8
+nBoolBits = 1
+nUnitBits = 1
 globalInitFuncName = AST.Name "PLATY_GLOBALS_INIT"
 
 
@@ -87,16 +90,16 @@ data Gdef =
 -- | Ty => LLVM Type
 tyToLLVMTy :: Ty -> AST.Type
 tyToLLVMTy IntTy  = AST.IntegerType {typeBits=nIntBits}
-tyToLLVMTy CharTy = AST.IntegerType {typeBits=8}
-tyToLLVMTy BoolTy = AST.IntegerType {typeBits=1}
-tyToLLVMTy UnitTy = AST.IntegerType {typeBits=1}
+tyToLLVMTy CharTy = AST.IntegerType {typeBits=nCharBits}
+tyToLLVMTy BoolTy = AST.IntegerType {typeBits=nBoolBits}
+tyToLLVMTy UnitTy = AST.IntegerType {typeBits=nUnitBits}
 
 -- | Lit => LLVM Type
 litToLLVMType :: Lit -> AST.Type
 litToLLVMType (IntLit _)  = AST.IntegerType {typeBits=nIntBits}
-litToLLVMType (CharLit _) = AST.IntegerType {typeBits=8}
-litToLLVMType (BoolLit _) = AST.IntegerType {typeBits=1}
-litToLLVMType (UnitLit)   = AST.IntegerType {typeBits=1}
+litToLLVMType (CharLit _) = AST.IntegerType {typeBits=nCharBits}
+litToLLVMType (BoolLit _) = AST.IntegerType {typeBits=nBoolBits}
+litToLLVMType (UnitLit)   = AST.IntegerType {typeBits=nUnitBits}
 
 -- | Expr => LLVM Type
 exprToLLVMType :: Expr -> AST.Type
@@ -140,15 +143,13 @@ getFreshCount = do
 -- | Lit => Operand
 litToOperand :: Lit -> AST.Operand
 litToOperand (IntLit i)   = AST.ConstantOperand AST.Constant.Int {AST.Constant.integerBits=nIntBits, AST.Constant.integerValue=toInteger i}
-litToOperand (CharLit ch) = AST.ConstantOperand AST.Constant.Int {AST.Constant.integerBits=8, AST.Constant.integerValue=toInteger $ Data.Char.ord ch}
-litToOperand (BoolLit b)  = AST.ConstantOperand AST.Constant.Int {AST.Constant.integerBits=1, AST.Constant.integerValue=if b then 1 else 0}
-litToOperand (UnitLit)    = AST.ConstantOperand AST.Constant.Int {AST.Constant.integerBits=1, AST.Constant.integerValue=1}
+litToOperand (CharLit ch) = AST.ConstantOperand AST.Constant.Int {AST.Constant.integerBits=nCharBits, AST.Constant.integerValue=toInteger $ Data.Char.ord ch}
+litToOperand (BoolLit b)  = AST.ConstantOperand AST.Constant.Int {AST.Constant.integerBits=nBoolBits, AST.Constant.integerValue=if b then 1 else 0}
+litToOperand (UnitLit)    = AST.ConstantOperand AST.Constant.Int {AST.Constant.integerBits=nUnitBits, AST.Constant.integerValue=1}
 
 -- | Add a basic block
 addBasicBlock :: AST.Global.BasicBlock -> ExprCodegen ()
-addBasicBlock _bb = do
-  -- Extract basicBlock fields
-  let AST.Global.BasicBlock name instrs terminator = _bb
+addBasicBlock (AST.Global.BasicBlock name instrs terminator) = do
   -- Get stacked instructions
   sInstrs <- gets stackedInstrs
   -- Create a basic block with stacked instructions
