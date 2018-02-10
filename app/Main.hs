@@ -76,7 +76,7 @@ data Expr =
   LitExpr Lit |
   IdentExpr Ident |
   IfExpr {condExpr :: Expr, thenExpr :: Expr, elseExpr :: Expr} |
-  ApplyExpr {calleeIdent :: Ident, params :: [Expr]} | -- NOTE: params can be Expr instead of [Expr] in the future -- TODO: Rename params to args
+  ApplyExpr {calleeIdent :: Ident, argExprs :: [Expr]} |
   LetExpr {binds :: [Bind], inExpr :: Expr}
   deriving (Show)
 
@@ -240,7 +240,7 @@ exprToExprCodegen (LetExpr {binds, inExpr}) = do
     exprToExprCodegen inExpr
 
   return inOpr
-exprToExprCodegen (ApplyExpr {calleeIdent=calleeIdent@(Ident calleeName), params}) = do
+exprToExprCodegen (ApplyExpr {calleeIdent=calleeIdent@(Ident calleeName), argExprs}) = do
   -- Get fresh prefix number
   prefixNumber <- getFreshCount
   -- Get global variable table
@@ -264,12 +264,12 @@ exprToExprCodegen (ApplyExpr {calleeIdent=calleeIdent@(Ident calleeName), params
                            , AST.isVarArg      = False
                            }
 
-      -- Eval args to operands
-      argumentOprs <- mapM exprToExprCodegen params
+      -- Eval argExprs to operands
+      argOprs <- mapM exprToExprCodegen argExprs
 
       -- Get LLVM arguments
       -- NOTE: [] may be hard code
-      let llvmArgs = fmap (\argExpr -> (argExpr, [])) argumentOprs
+      let llvmArgs = fmap (\argExpr -> (argExpr, [])) argOprs
 
       -- Call instruction
       -- NOTE: Why llvm-hs-quote isn't used here? => Because llvm-has-quote doesn't have an antiquote for argument (Issue: https://github.com/llvm-hs/llvm-hs-quote/issues/18)
@@ -680,7 +680,7 @@ main = do
   TIO.putStrLn (LLVM.Pretty.ppll mod7)
   putStrLn("----------------------------------")
 
-  let gdef11 = FuncGdef {ident=Ident "main", params=[], retTy=UnitTy, bodyExpr=ApplyExpr{calleeIdent=Ident "print-int", params=[LitExpr $ IntLit 171717]}}
+  let gdef11 = FuncGdef {ident=Ident "main", params=[], retTy=UnitTy, bodyExpr=ApplyExpr{calleeIdent=Ident "print-int", argExprs=[LitExpr $ IntLit 171717]}}
   let Right mod8 = gdefsToModule [gdef11]
   toLLVM mod8
   putStrLn("----------------------------------")
