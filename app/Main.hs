@@ -17,6 +17,7 @@ import Data.ByteString.Short
 import qualified Data.Text.Lazy.IO as TIO
 import qualified Data.Map as Map
 import Data.Map (Map)
+import qualified Data.Foldable as Foldable
 import qualified Control.Monad.Trans as Monad.Trans
 import Control.Applicative ((<|>))
 import qualified Data.Either.Utils as Either.Utils
@@ -111,7 +112,8 @@ exprToLLVMType (LetExpr{inExpr})   = exprToLLVMType inExpr
 
 
 data IdentInfo =
-  VarIdentInfo  {ty :: Ty, globalPtrName :: AST.Name} |
+  GVarIdentInfo {ty :: Ty, globalPtrName :: AST.Name} |
+  LVarIdentInfo {ty :: Ty, localName :: AST.Name} |
   FuncIdentInfo {retTy :: Ty, funcName :: AST.Name}
   deriving (Show)
 
@@ -133,6 +135,7 @@ type ErrorType = String
 newtype ExprCodegen a = ExprCodegen {runExprCodegen :: StateT ExprCodegenEnv (Either ErrorType) a}
   deriving (Functor, Applicative, Monad, MonadState ExprCodegenEnv)
 
+-- | Get fresh int count (zero-origin)
 getFreshCount :: ExprCodegen Int
 getFreshCount = do
   c <- gets count
@@ -184,7 +187,7 @@ exprToExprCodegen (IdentExpr ident@(Ident name)) = do
   -- Get identifier information
   indentInfo <- ExprCodegen $ Monad.Trans.lift $ Either.Utils.maybeToEither notFoundMsg varInfoMaybe
   case indentInfo of
-    VarIdentInfo{ty, globalPtrName} -> do
+    GVarIdentInfo{ty, globalPtrName} -> do
       let llvmTy    = tyToLLVMTy ty
           llvmPtrTy = AST.Type.ptr llvmTy
       -- Get fresh count for prefix of loaded value of global variable
@@ -195,7 +198,41 @@ exprToExprCodegen (IdentExpr ident@(Ident name)) = do
       stackInstruction (loadedGVarName := callInstr)
       return $ AST.LocalReference llvmTy loadedGVarName
 
+    LVarIdentInfo{ty, localName} -> do
+      let llvmTy    = tyToLLVMTy ty
+      return $ AST.LocalReference llvmTy localName
+
     FuncIdentInfo{} -> undefined -- TODO: impl
+exprToExprCodegen (LetExpr {binds, inExpr}) = do
+  -- Get fresh prefix number
+  prefixNumber <- getFreshCount
+
+  -- TODO: Rename better
+  let f :: Map Ident IdentInfo -> Bind -> ExprCodegen (Map Ident IdentInfo)
+      f lVarMap (Bind {ident=ident@(Ident name), ty, bodyExpr}) = do
+        -- Push `lVarMap` to  `localVarTables`
+        modify (\env@ExprCodegenEnv{localVarTables} -> env{localVarTables=lVarMap:localVarTables})
+        -- Eval bodyExpr to operand
+        bodyOpr <- exprToExprCodegen bodyExpr
+        -- Local variable name
+        let localName = AST.Name (strToShort [Here.i|$$local${prefixNumber}/${name}|])
+        let newlVarMap = Map.insert ident (LVarIdentInfo{ty=ty, localName=localName}) lVarMap
+        -- Stack an instruction of local definition
+        stackInstruction (localName := [Quote.LLVM.lli| $opr:bodyOpr |])
+        -- Pop from localVarTables
+        modify (\env@ExprCodegenEnv{localVarTables=_:lVarTables} -> env{localVarTables=lVarTables})
+        return newlVarMap
+
+  -- Define all binds
+  localVariableMap <- Foldable.foldlM f (Map.empty :: Map Ident IdentInfo) binds
+  -- Push `lVarMap` to  `localVarTables`
+  modify (\env@ExprCodegenEnv{localVarTables} -> env{localVarTables=localVariableMap:localVarTables})
+  -- Eval inExpr of local `let` to operand
+  inOpr <- exprToExprCodegen inExpr
+  -- Pop from localVarTables
+  modify (\env@ExprCodegenEnv{localVarTables=_:lVarTables} -> env{localVarTables=lVarTables})
+
+  return inOpr
 
 exprToExprCodegen (IfExpr {condExpr, thenExpr, elseExpr}) = do
   -- Get fresh count for prefix of label
@@ -426,7 +463,7 @@ gdefsToModule gdefs = do
                   definitions         = []
                 , globalInitFuncs     = []
                 }
-      f (LetGdef (Bind {ident, ty})) = (ident, VarIdentInfo {ty=ty, globalPtrName=genGlobalVarName ident})
+      f (LetGdef (Bind {ident, ty})) = (ident, GVarIdentInfo {ty=ty, globalPtrName=genGlobalVarName ident})
       f (FuncGdef {ident, retTy})    = (ident, FuncIdentInfo {retTy=retTy, funcName=genFuncName ident})
       globalVarMap = Map.fromList (fmap f gdefs)
   GdefCodegenEnv{definitions, globalInitFuncs} <- execStateT (runGdefCodegen $ mapM_ (gdefToGdefCodegen globalVarMap) gdefs) initEnv
@@ -512,9 +549,23 @@ main = do
 
   let gdef6 = LetGdef {bind=Bind {ident=Ident "myint", ty=IntTy, bodyExpr=LitExpr $ IntLit 8877}}
   let gdef7 = LetGdef {bind=Bind {ident=Ident "myint2", ty=IntTy, bodyExpr=IdentExpr $ Ident "myint"}}
-  let Right mod1 = gdefsToModule [gdef6, gdef7]
-  toLLVM mod1
+  let Right mod5 = gdefsToModule [gdef6, gdef7]
+  toLLVM mod5
   putStrLn("----------------------------------")
+
+  let gdef8 = LetGdef {bind=Bind {ident=Ident "value1", ty=IntTy, bodyExpr=LetExpr {binds = [Bind{ident=Ident "a", ty=IntTy, bodyExpr=LitExpr $ IntLit 8989}, Bind{ident=Ident "b", ty=IntTy, bodyExpr=LitExpr $ IntLit 3344}], inExpr=IdentExpr (Ident "a")}}}
+  let Right mod6 = gdefsToModule [gdef8]
+  toLLVM mod6
+  putStrLn("----------------------------------")
+
+
+  let gdef9 = LetGdef {bind=Bind {ident=Ident "value1", ty=IntTy, bodyExpr=LetExpr {binds = [Bind{ident=Ident "a", ty=IntTy, bodyExpr=LitExpr $ IntLit 8989}, Bind{ident=Ident "b", ty=IntTy, bodyExpr=IdentExpr (Ident "a")}], inExpr=IdentExpr (Ident "b")}}}
+  let Right mod7 = gdefsToModule [gdef9]
+  toLLVM mod7
+  putStrLn("----------------------------------")
+  TIO.putStrLn (LLVM.Pretty.ppll mod7)
+  putStrLn("----------------------------------")
+
 
 
 
