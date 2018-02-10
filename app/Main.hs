@@ -186,7 +186,7 @@ withLVarTable lVarMap f = do
   modify (\env@ExprCodegenEnv{localVarTables=_:rest} -> env{localVarTables=rest})
   return ret
 
--- TODO: Impl
+-- | Expr => Operand
 exprToExprCodegen :: Expr -> ExprCodegen AST.Operand
 exprToExprCodegen (LitExpr lit) = return (litToOperand lit)
 exprToExprCodegen (IdentExpr ident@(Ident name)) = do
@@ -562,13 +562,20 @@ gdefsToModule gdefs = do
             declare i32 @printf(i8*, ...)
           |]
 
+
+          printfParamName = AST.Name "value"
+          chPtrName       = AST.Name "ch_ptr"
+          llvmUnitTy      = tyToLLVMTy UnitTy
+          llvmUnitValue   = litToOperand UnitLit
+
           -- NOTE: `i1` is Unit Type
           printIntDef = [Quote.LLVM.lldef|
-            define i1 @print-int(i32 %v){
+            define $type:llvmUnitTy @print-int(i32 $id:printfParamName){
             entry:
-                %ch_ptr = $instr:gepInstr
+                $id:chPtrName = $instr:gepInstr
                 $instr:callPrintfInstr
-                ret i1 1
+                %unit_value = $opr:llvmUnitValue
+                ret $type:llvmUnitTy %unit_value
             }
           |]
             where
@@ -597,7 +604,7 @@ gdefsToModule gdefs = do
                                   AST.callingConvention  = AST.CallingConvention.C,
                                   AST.returnAttributes   = [],
                                   AST.function           = Right $ AST.ConstantOperand $ AST.Constant.GlobalReference printfTy (AST.Name "printf"),
-                                  AST.arguments          = [(AST.LocalReference (AST.Type.ptr AST.Type.i8) (AST.Name "ch_ptr"), []), (AST.LocalReference (AST.Type.i32) (AST.Name "v"), [])],
+                                  AST.arguments          = [(AST.LocalReference (AST.Type.ptr AST.Type.i8) (chPtrName), []), (AST.LocalReference (AST.Type.i32) (printfParamName), [])],
                                   AST.functionAttributes = [],
                                   AST.metadata           = []
                                 }
