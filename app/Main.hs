@@ -155,10 +155,8 @@ addBasicBlock _bb = do
   let bb = AST.Global.BasicBlock name (sInstrs ++ instrs) terminator
   -- Clear stacked instructions
   modify (\env -> env{stackedInstrs=[]})
-  -- Get current basic blocks
-  bbs <- gets basicBlocks
   -- Add a basic block
-  modify (\env -> env {basicBlocks = bbs++[bb]}) -- TODO[Refactor]: Get basicBlocks by extracting from env
+  modify (\env@ExprCodegenEnv{basicBlocks} -> env {basicBlocks = basicBlocks++[bb]})
 
 
 -- | Stack an instruction
