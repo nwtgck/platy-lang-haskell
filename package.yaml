@@ -28,11 +28,9 @@ library:
    - mtl
    - containers
    - bytestring
-   - text
    - transformers
    - MissingH
    - here
-   - interpolate
    - llvm-hs
    - llvm-hs-pure
    - llvm-hs-pretty
@@ -48,18 +46,13 @@ executables:
     - -with-rtsopts=-N
     dependencies:
      - platy-lang
-     - mtl
      - containers
      - bytestring
      - text
-     - transformers
-     - MissingH
      - here
-     - interpolate
      - llvm-hs
      - llvm-hs-pure
      - llvm-hs-pretty
-     - llvm-hs-quote
 
 tests:
   platy-lang-test:

@@ -10,12 +10,10 @@ module Platy.Codegen where
 import Control.Monad.State
 import qualified Data.Char
 import qualified Data.String.Here as Here
-import Data.String.Interpolate as Interpolate
 import Control.Monad (mapM_)
 import qualified Data.ByteString.Char8 as BS
 import Data.String      (IsString(..))
 import Data.ByteString.Short
-import qualified Data.Text.Lazy.IO as TIO
 import qualified Data.Map as Map
 import Data.Map (Map)
 import qualified Data.Foldable as Foldable
@@ -33,7 +31,6 @@ import qualified LLVM.AST.Constant as AST.Constant
 import qualified LLVM.AST.Global as AST.Global
 import qualified LLVM.AST.AddrSpace as AST.AddrSpace
 import qualified LLVM.AST.CallingConvention as AST.CallingConvention
-import qualified LLVM.Pretty
 
 import Debug.Trace
 
