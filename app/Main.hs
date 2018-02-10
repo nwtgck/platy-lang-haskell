@@ -273,7 +273,7 @@ exprToExprCodegen (ApplyExpr {calleeIdent=calleeIdent@(Ident calleeName), params
 
       -- Call instruction
       -- NOTE: Why llvm-hs-quote isn't used here? => Because llvm-has-quote doesn't have an antiquote for argument (Issue: https://github.com/llvm-hs/llvm-hs-quote/issues/18)
-      let callInst = resName := AST.Do AST.Call {
+      let callInst = resName := AST.Call {
                                   AST.tailCallKind       = Nothing,
                                   AST.callingConvention  = AST.CallingConvention.C,
                                   AST.returnAttributes   = [],
@@ -282,6 +282,9 @@ exprToExprCodegen (ApplyExpr {calleeIdent=calleeIdent@(Ident calleeName), params
                                   AST.functionAttributes = [],
                                   AST.metadata           = []
                                 }
+
+      -- Stack the call instruction
+      stackInstruction callInst
 
       return $ AST.LocalReference llvmRetTy resName
     _  -> fail ([Here.i|Should be function identifier |])
@@ -518,7 +521,11 @@ gdefsToModule gdefs = do
       f (LetGdef (Bind {ident, ty})) = (ident, GVarIdentInfo {ty=ty, globalPtrName=genGlobalVarName ident})
       f (FuncGdef {ident, retTy, params})    = (ident, FuncIdentInfo {retTy=retTy, paramTys=[ty | Param {ty} <- params], funcName=genFuncName ident})
       globalVarMap = Map.fromList (fmap f gdefs)
-  GdefCodegenEnv{definitions, globalInitFuncs} <- execStateT (runGdefCodegen $ mapM_ (gdefToGdefCodegen globalVarMap) gdefs) initEnv
+
+      -- TODO: Remove `stdVarMap` in the future
+      stdVarMap = Map.fromList [(Ident "print-int", FuncIdentInfo{retTy=UnitTy, paramTys=[IntTy], funcName=AST.Name "print-int"})]
+
+  GdefCodegenEnv{definitions, globalInitFuncs} <- execStateT (runGdefCodegen $ mapM_ (gdefToGdefCodegen (Map.union globalVarMap stdVarMap)) gdefs) initEnv
 
   let globalCtorsDef = [Quote.LLVM.lldef|
    @llvm.global_ctors = appending global [1 x { i32, void ()*, i8* }]
@@ -541,9 +548,64 @@ gdefsToModule gdefs = do
         }
       |]
 
+  -- TODO: `stdlibDefs` should move to stdlib for Platy
+  let stdlibDefs = [intFormatDef, printfDef, printIntDef]
+        where
+          intFormatDef = [Quote.LLVM.lldef|
+            @int_format_str = private constant [4 x i8] c"%d\0A\00"
+          |]
+          intFormatTy = AST.Type.ptr AST.ArrayType {
+                          AST.nArrayElements = 4
+                        , AST.elementType    = AST.IntegerType {AST.typeBits = 8}
+                        }
+          printfDef = [Quote.LLVM.lldef|
+            declare i32 @printf(i8*, ...)
+          |]
+
+          -- NOTE: `i1` is Unit Type
+          printIntDef = [Quote.LLVM.lldef|
+            define i1 @print-int(i32 %v){
+            entry:
+                %ch_ptr = $instr:gepInstr
+                $instr:callPrintfInstr
+                ret i1 1
+            }
+          |]
+            where
+              -- FIXME: The following values shouldn't be not necessary, because all printIntDef is like the following IR. However llvm-hs-quote has error.
+--              define void @"print-int"(i32 %v) {
+--              entry:
+--                call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([4 x i8], [4 x i8]* @int_format_str, i64 0, i64 0))
+--                ret void
+--              }
+              gepInstr = Left AST.GetElementPtr {
+                             AST.inBounds = False,
+                             AST.address  = AST.ConstantOperand $ AST.Constant.GlobalReference intFormatTy (AST.Name "int_format_str"),
+                             AST.indices  = let i64Zero = AST.ConstantOperand AST.Constant.Int {AST.Constant.integerBits=64, AST.Constant.integerValue=0} in [i64Zero, i64Zero],
+                             AST.metadata = []
+                           }
+
+              printfTy = AST.Type.ptr
+                AST.FunctionType {
+                    AST.resultType    = AST.Type.i32
+                  , AST.argumentTypes = [AST.Type.ptr AST.Type.i8]
+                  , AST.isVarArg      = True
+                  }
+
+              callPrintfInstr = Left AST.Call {
+                                  AST.tailCallKind       = Nothing,
+                                  AST.callingConvention  = AST.CallingConvention.C,
+                                  AST.returnAttributes   = [],
+                                  AST.function           = Right $ AST.ConstantOperand $ AST.Constant.GlobalReference printfTy (AST.Name "printf"),
+                                  AST.arguments          = [(AST.LocalReference (AST.Type.ptr AST.Type.i8) (AST.Name "ch_ptr"), []), (AST.LocalReference (AST.Type.i32) (AST.Name "v"), [])],
+                                  AST.functionAttributes = [],
+                                  AST.metadata           = []
+                                }
+
+
   return AST.defaultModule{
     AST.moduleDefinitions =
-      [globalCtorsDef, globalInitFuncDef]++ definitions ++ globalInitFuncs
+      stdlibDefs ++ [globalCtorsDef, globalInitFuncDef]++ definitions ++ globalInitFuncs
   }
 
 
@@ -616,6 +678,11 @@ main = do
   toLLVM mod7
   putStrLn("----------------------------------")
   TIO.putStrLn (LLVM.Pretty.ppll mod7)
+  putStrLn("----------------------------------")
+
+  let gdef11 = FuncGdef {ident=Ident "main", params=[], retTy=UnitTy, bodyExpr=ApplyExpr{calleeIdent=Ident "print-int", params=[LitExpr $ IntLit 171717]}}
+  let Right mod8 = gdefsToModule [gdef11]
+  toLLVM mod8
   putStrLn("----------------------------------")
 
 
