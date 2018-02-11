@@ -70,7 +70,8 @@ type VarTable = Map Ident IdentInfo
 data ExprCodegenEnv =
  ExprCodegenEnv {
    basicBlocks     :: [AST.Global.BasicBlock]
- , stackedInstrs   :: [AST.Named AST.Instruction]
+ , stackedLabels   :: [AST.Name]                  -- latest is in first
+ , stackedInstrs   :: [AST.Named AST.Instruction] -- latest is in last
  , globalVarTable  :: VarTable
  , localVarTables  :: [VarTable]
  , count           :: Int
@@ -98,13 +99,23 @@ litToOperand (CharLit ch) = AST.ConstantOperand AST.Constant.Int {AST.Constant.i
 litToOperand (BoolLit b)  = AST.ConstantOperand AST.Constant.Int {AST.Constant.integerBits=nBoolBits, AST.Constant.integerValue=if b then 1 else 0}
 litToOperand (UnitLit)    = AST.ConstantOperand AST.Constant.Int {AST.Constant.integerBits=nUnitBits, AST.Constant.integerValue=1}
 
--- | Add a basic block
-addBasicBlock :: AST.Global.BasicBlock -> ExprCodegen ()
-addBasicBlock (AST.Global.BasicBlock name instrs terminator) = do
+-- | Set current label
+addLabel :: AST.Name -> ExprCodegen ()
+addLabel label = do
+  modify (\env@ExprCodegenEnv{stackedLabels} -> env{stackedLabels=label:stackedLabels})
+
+
+-- | Set terminate a block with terminator
+setTerminator :: Named AST.Terminator -> ExprCodegen ()
+setTerminator terminator = do
+  -- Get current label
+  label:_ <- gets stackedLabels
+  -- Pop the first label
+  modify (\env@ExprCodegenEnv{stackedLabels=_:rest} -> env{stackedLabels=rest})
   -- Get stacked instructions
   sInstrs <- gets stackedInstrs
   -- Create a basic block with stacked instructions
-  let bb = AST.Global.BasicBlock name (sInstrs ++ instrs) terminator
+  let bb = AST.Global.BasicBlock label sInstrs terminator
   -- Clear stacked instructions
   modify (\env -> env{stackedInstrs=[]})
   -- Add a basic block
@@ -250,62 +261,39 @@ exprToExprCodegen (IfExpr {condExpr, thenExpr, elseExpr}) = do
       elseLabel   = AST.Name (strToShort [Here.i|${labelPrefix}/else|])
       endLabel    = AST.Name (strToShort [Here.i|${labelPrefix}/end|])
 
+  -- ==== Condition ====
   -- Eval condExpr to Operand
   condOperand <- exprToExprCodegen condExpr
+  stackInstruction (ifcondValueName := [Quote.LLVM.lli|$opr:condOperand|])
+  setTerminator (AST.Do [Quote.LLVM.llt|br i1 $id:ifcondValueName, label $id:thenLabel, label $id:elseLabel|])
 
-  -- FIXME: In the future, llbb may be added, then rewrite
-  let AST.GlobalDefinition AST.Global.Function{basicBlocks=[ifStartBlock]} = [Quote.LLVM.lldef|
-    define void @_(){
-    $id:startLabel
-      $id:ifcondValueName = $opr:condOperand
-      br i1 $id:ifcondValueName, label $id:thenLabel, label $id:elseLabel
-    }
-  |]
-  -- Add then block
-  addBasicBlock ifStartBlock
 
+  -- ==== Then Block ====
+  -- Set then-label
+  addLabel (thenLabel)
   -- Eval thenExpr to Operand
   -- (NOTE: ORDER IS IMPORTANT: exprToExprCodegen can add new Basic Blocks)
   thenOperand <- exprToExprCodegen thenExpr
+  -- Add a instruction
+  stackInstruction (thenValueName := [Quote.LLVM.lli|$opr:thenOperand|])
+  -- Set terminator of then
+  setTerminator (AST.Do [Quote.LLVM.llt|br label $id:endLabel|])
 
-  -- Create elseBlock
-  -- FIXME: In the future, llbb may be added, then rewrite
-  let AST.GlobalDefinition AST.Global.Function{basicBlocks=[thenBlock]} = [Quote.LLVM.lldef|
-    define void @_(){
-    $id:thenLabel
-      $id:thenValueName = $opr:thenOperand
-      br label $id:endLabel
-    }
-  |]
-  -- Add thenblock
-  addBasicBlock thenBlock
-
+  -- ==== Then Block ====
+  -- Set else-label
+  addLabel (elseLabel)
   -- Eval elseExpr to Operand
   -- (NOTE: ORDER IS IMPORTANT: exprToExprCodegen can add new Basic Blocks)
   elseOperand <- exprToExprCodegen elseExpr
+  -- Add a instruction
+  stackInstruction (elseValueName := [Quote.LLVM.lli|$opr:elseOperand|])
+  -- Set terminator of then
+  setTerminator (AST.Do [Quote.LLVM.llt|br label $id:endLabel|])
 
-  -- Create elseBlock
-  -- FIXME: In the future, llbb may be added, then rewrite
-  let AST.GlobalDefinition AST.Global.Function{basicBlocks=[elseBlock]} = [Quote.LLVM.lldef|
-    define void @_(){
-    $id:elseLabel
-      $id:elseValueName = $opr:elseOperand
-      br label $id:endLabel
-    }
-  |]
-  -- Add elseblock
-  addBasicBlock elseBlock
+  -- ==== End-if ====
+  addLabel (endLabel)
+  stackInstruction (endValueName := [Quote.LLVM.lli|phi i32 [$id:thenValueName, $id:thenLabel], [$id:elseValueName, $id:elseLabel]|])
 
-  -- Create ifend
-  -- FIXME: In the future, llbb may be added, then rewrite
-  let AST.GlobalDefinition AST.Global.Function{basicBlocks=[endBlock]} = [Quote.LLVM.lldef|
-    define void @_(){
-    $id:endLabel
-      $id:endValueName = phi i32 [$id:thenValueName, $id:thenLabel], [$id:elseValueName, $id:elseLabel]
-    }
-  |]
-  -- Add endblock
-  addBasicBlock endBlock
 
   let ty = exprToLLVMType thenExpr
   return $ AST.LocalReference ty endValueName
@@ -317,6 +305,7 @@ exprToOperandEither globalVarTable expr = runStateT (runExprCodegen $ exprToExpr
   where
     initEnv = ExprCodegenEnv {
                 basicBlocks    = []
+              , stackedLabels  = [AST.Name "entry"]
               , stackedInstrs  = []
               , globalVarTable = globalVarTable
               , localVarTables = []
@@ -367,7 +356,7 @@ gdefToGdefCodegen globalVarTable (LetGdef (Bind {ident=ident@(Ident name), ty, b
   -- Evaluate bodyExpr
   let operandEither = exprToOperandEither globalVarTable bodyExpr
   -- Get operand and env
-  (bodyOperand, ExprCodegenEnv{basicBlocks, stackedInstrs}) <- GdefCodegen (Monad.Trans.lift operandEither)
+  (bodyOperand, ExprCodegenEnv{basicBlocks, stackedInstrs, stackedLabels=[lastLabel]}) <- GdefCodegen (Monad.Trans.lift operandEither)
   -- NOTE: Should avoid to using PLATY_GLOBAL_RES if an user uses this name then fail
   let funcDef = AST.GlobalDefinition AST.Global.functionDefaults
         { AST.Global.name        = initFuncName
@@ -377,7 +366,7 @@ gdefToGdefCodegen globalVarTable (LetGdef (Bind {ident=ident@(Ident name), ty, b
         }
         where
           restBasicBlock = AST.Global.BasicBlock
-              (AST.Name "nextblock") -- FIXME: Shouldn't use "nextblock" ("nextblock" is determined by llvm-hs-quote)
+              lastLabel
               -- NOTE: stackedInstrs added
               (stackedInstrs ++ [
                 AST.Name "PLATY_GLOBAL_RES" := [Quote.LLVM.lli| $opr:bodyOperand |],
@@ -418,7 +407,7 @@ gdefToGdefCodegen globalVarTable (FuncGdef {ident=ident@(Ident name), params, re
   -- Evaluate bodyExpr
   let operandEither = exprToOperandEither globalVarTable bodyExpr
   -- Get operand and env
-  (bodyOperand, ExprCodegenEnv{basicBlocks, stackedInstrs}) <- GdefCodegen (Monad.Trans.lift operandEither)
+  (bodyOperand, ExprCodegenEnv{basicBlocks, stackedInstrs, stackedLabels=[lastLabel]}) <- GdefCodegen (Monad.Trans.lift operandEither)
 
   let funcName  = genFuncName ident
       llvmRetTy = tyToLLVMTy retTy
@@ -432,7 +421,7 @@ gdefToGdefCodegen globalVarTable (FuncGdef {ident=ident@(Ident name), params, re
         }
         where
           restBasicBlock = AST.Global.BasicBlock
-              (AST.Name "nextblock") -- FIXME: Shouldn't use "nextblock" ("nextblock" is determined by llvm-hs-quote)
+              lastLabel
               -- NOTE: stackedInstrs added
               (stackedInstrs ++ [
                 AST.Name "PLATY_GLOBAL_RES" := [Quote.LLVM.lli| $opr:bodyOperand |]

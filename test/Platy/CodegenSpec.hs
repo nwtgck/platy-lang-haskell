@@ -116,7 +116,6 @@ spec = do
 
     it "local-identifier main" $ do
       -- [corresponding platy code] NOTE: Syntax maybe wrong
-      -- (@global-let gval1 Int 29292)
       -- (@global-let main Unit
       --    (@let [
       --      (= a Int 9898)
@@ -168,3 +167,41 @@ spec = do
       stdout <- TestUtils.execGdefs [gdef1]
       -- Compare with expectation
       stdout `shouldBe` "9898\n21212\n"
+
+    it "nest-if main" $ do
+      -- [corresponding platy code] NOTE: Syntax maybe wrong
+      -- (@global-let main Unit
+      --    (print-int (@if False
+      --      2299
+      --      (@if True
+      --        6633
+      --        9900
+      --      )
+      --    ))
+      -- )
+      let gdef1 = FuncGdef
+                    { ident = Ident "main"
+                    , params = []
+                    , retTy = UnitTy
+                    , bodyExpr =
+                      ApplyExpr
+                      { calleeIdent = Ident "print-int"
+                      , argExprs =
+                        [ IfExpr
+                          { condExpr = LitExpr $ BoolLit False
+                          , thenExpr = LitExpr $ IntLit 2299
+                          , elseExpr =
+                            IfExpr
+                            { condExpr = LitExpr $ BoolLit True
+                            , thenExpr = LitExpr $ IntLit 6633
+                            , elseExpr = LitExpr $ IntLit 9900
+                            }
+                          }
+                        ]
+                      }
+                    }
+
+      -- Execute and Get stdout
+      stdout <- TestUtils.execGdefs [gdef1]
+      -- Compare with expectation
+      stdout `shouldBe` "6633\n"

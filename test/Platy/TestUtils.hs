@@ -4,7 +4,9 @@ module Platy.TestUtils where
 
 import           Test.Hspec
 
+import qualified Control.Monad as Monad
 import qualified Data.ByteString as ByteString
+import qualified Data.Text.Lazy.IO as TIO
 import qualified System.IO.Temp as Temp
 import qualified System.Process as Process
 import qualified System.IO as IO
@@ -12,6 +14,7 @@ import qualified Data.String.Here as Here
 import qualified Data.Either as Either
 
 import qualified LLVM.AST as AST
+import qualified LLVM.Pretty
 
 import Platy.Utils
 import Platy.Datatypes
@@ -47,6 +50,9 @@ execGdefs gdefs = do
   llvmModEither `shouldSatisfy` Either.isRight
   -- Extract module
   let Right llvmMod = llvmModEither
+  Monad.when True $
+    -- Print module
+    TIO.putStrLn (LLVM.Pretty.ppllvm llvmMod)
   -- Generate object byte string
   objBString <- toObjByteString llvmMod
   -- Execute and Get stdout
