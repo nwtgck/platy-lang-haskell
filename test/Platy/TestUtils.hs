@@ -50,7 +50,7 @@ execGdefs gdefs = do
   llvmModEither `shouldSatisfy` Either.isRight
   -- Extract module
   let Right llvmMod = llvmModEither
-  Monad.when True $
+  Monad.when False $
     -- Print module
     TIO.putStrLn (LLVM.Pretty.ppllvm llvmMod)
   -- Generate object byte string

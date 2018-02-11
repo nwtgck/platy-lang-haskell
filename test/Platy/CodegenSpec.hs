@@ -168,7 +168,7 @@ spec = do
       -- Compare with expectation
       stdout `shouldBe` "9898\n21212\n"
 
-    it "nest-if main" $ do
+    it "nested-if main" $ do
       -- [corresponding platy code] NOTE: Syntax maybe wrong
       -- (@global-let main Unit
       --    (print-int (@if False
@@ -205,3 +205,76 @@ spec = do
       stdout <- TestUtils.execGdefs [gdef1]
       -- Compare with expectation
       stdout `shouldBe` "6633\n"
+
+
+    it "nested-let main" $ do
+      -- [corresponding platy code] NOTE: Syntax maybe wrong
+      -- (@global-let main Unit
+      --    (@let [
+      --      (= a Int 9911)
+      --      (= b Int (@let [
+      --        (= c Int 669944)
+      --        (= d Int 881122)
+      --      ] d))
+      --      (= __dummy1__ Unit (print-int a))
+      --      (= __dummy2__ Unit (print-int b))
+      --    ] Unit)
+      -- )
+      let gdef1 = FuncGdef
+                  { ident = Ident "main"
+                  , params = []
+                  , retTy = UnitTy
+                  , bodyExpr =
+                    LetExpr
+                    { binds =
+                      [ Bind
+                        { ident = Ident "a"
+                        , ty = IntTy
+                        , bodyExpr = LitExpr $ IntLit 9911
+                        }
+                      , Bind
+                        { ident = Ident "b"
+                        , ty = IntTy
+                        , bodyExpr =
+                          LetExpr
+                          { binds =
+                            [ Bind
+                              { ident = Ident "c"
+                              , ty = IntTy
+                              , bodyExpr = LitExpr $ IntLit 669944
+                              }
+                            , Bind
+                              { ident = Ident "d"
+                              , ty = IntTy
+                              , bodyExpr = LitExpr $ IntLit 881122
+                              }
+                            ]
+                          , inExpr = IdentExpr $ Ident "d"
+                          }
+                        }
+                      , Bind
+                        { ident = Ident "__dummy1__"
+                        , ty = UnitTy
+                        , bodyExpr =
+                          ApplyExpr
+                          { calleeIdent = Ident "print-int"
+                          , argExprs = [IdentExpr $ Ident "a"]
+                          }
+                        }
+                      , Bind
+                        { ident = Ident "__dummy2__"
+                        , ty = UnitTy
+                        , bodyExpr =
+                          ApplyExpr
+                          { calleeIdent = Ident "print-int"
+                          , argExprs = [IdentExpr $ Ident "b"]
+                          }
+                        }
+                      ]
+                    , inExpr = LitExpr UnitLit
+                    }
+                  }
+      -- Execute and Get stdout
+      stdout <- TestUtils.execGdefs [gdef1]
+      -- Compare with expectation
+      stdout `shouldBe` "9911\n881122\n"
