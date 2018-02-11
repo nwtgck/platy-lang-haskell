@@ -25,12 +25,12 @@ import Platy.Utils
 main :: IO ()
 main = do
   let expr1 = LitExpr (IntLit 1515)
-  let Right (operand1, exprCodeEnv1) = exprToOperandEither Map.empty expr1
+  let Right (operand1, exprCodeEnv1) = exprToOperandEither Map.empty [] expr1
   print operand1
   print exprCodeEnv1
 
   let expr2 = IfExpr (LitExpr $ BoolLit True) (LitExpr $ IntLit 81818) (LitExpr $ IntLit 23232)
-  let Right (operand2, exprCodeEnv2) = exprToOperandEither Map.empty expr2
+  let Right (operand2, exprCodeEnv2) = exprToOperandEither Map.empty [] expr2
   print operand2
   print exprCodeEnv2
 

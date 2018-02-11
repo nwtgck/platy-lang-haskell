@@ -356,3 +356,36 @@ spec = do
       stdout <- TestUtils.execGdefs [gdef1]
       -- Compare with expectation
       stdout `shouldBe` "9911\n881122\n"
+
+
+    it "func-def main" $ do
+      -- [corresponding platy code] NOTE: Syntax maybe wrong
+      -- (@global-let main Unit
+      --    (print-int 171717)
+      -- )
+      let gdef1 = FuncGdef
+                   { ident = Ident "myfunc"
+                   , params = [Param {ident=Ident "a", ty=IntTy}, Param {ident=Ident "b", ty=IntTy}]
+                   , retTy = UnitTy
+                   , bodyExpr =
+                     ApplyExpr
+                     { calleeIdent = Ident "print-int"
+                     , argExprs = [IdentExpr (Ident "b")]
+                     }
+                   }
+
+      let gdef2 = FuncGdef
+                   { ident = Ident "main"
+                   , params = []
+                   , retTy = UnitTy
+                   , bodyExpr =
+                     ApplyExpr
+                     { calleeIdent = Ident "myfunc"
+                     , argExprs = [LitExpr $ IntLit 449999, LitExpr $ IntLit 3300]
+                     }
+                   }
+
+      -- Execute and Get stdout
+      stdout <- TestUtils.execGdefs [gdef1, gdef2]
+      -- Compare with expectation
+      stdout `shouldBe` "3300\n"

@@ -332,15 +332,15 @@ exprToExprCodegen (ifexpr@IfExpr {condExpr, thenExpr, elseExpr}) = do
 
 
 -- | Expr => Operand
-exprToOperandEither :: VarTable -> Expr -> Either ErrorType (AST.Operand, ExprCodegenEnv)
-exprToOperandEither globalVarTable expr = runStateT (runExprCodegen $ exprToExprCodegen expr) initEnv
+exprToOperandEither :: VarTable -> [VarTable] -> Expr -> Either ErrorType (AST.Operand, ExprCodegenEnv)
+exprToOperandEither globalVarTable localVarTables expr = runStateT (runExprCodegen $ exprToExprCodegen expr) initEnv
   where
     initEnv = ExprCodegenEnv {
                 basicBlocks    = []
               , stackedLabels  = [AST.Name "entry"]
               , stackedInstrs  = []
               , globalVarTable = globalVarTable
-              , localVarTables = []
+              , localVarTables = localVarTables
               , count          = 0
               }
 
@@ -375,6 +375,10 @@ genGlobalVarName (Ident name) = AST.Name (strToShort [Here.i|${name}/ptr|])
 genFuncName :: Ident -> AST.Name
 genFuncName (Ident name) = AST.Name (strToShort name)
 
+-- | Generate parameter name
+genParamName :: Ident -> AST.Name
+genParamName (Ident name) = AST.Name (strToShort [Here.i|$$param/${name}|])
+
 -- Gdef => GdefCodegen
 gdefToGdefCodegen :: VarTable -> Gdef -> GdefCodegen ()
 gdefToGdefCodegen globalVarTable (LetGdef (Bind {ident=ident@(Ident name), ty, bodyExpr})) = do
@@ -386,7 +390,7 @@ gdefToGdefCodegen globalVarTable (LetGdef (Bind {ident=ident@(Ident name), ty, b
   -- Add the definition
   addDefinition globalDef
   -- Evaluate bodyExpr
-  let operandEither = exprToOperandEither globalVarTable bodyExpr
+  let operandEither = exprToOperandEither globalVarTable [] bodyExpr
   -- Get operand and env
   (bodyOperand, ExprCodegenEnv{basicBlocks, stackedInstrs, stackedLabels=[lastLabel]}) <- GdefCodegen (Monad.Trans.lift operandEither)
   -- NOTE: Should avoid to using PLATY_GLOBAL_RES if an user uses this name then fail
@@ -436,8 +440,12 @@ gdefToGdefCodegen globalVarTable (LetGdef (Bind {ident=ident@(Ident name), ty, b
   addDefinition getterFuncDef
   return ()
 gdefToGdefCodegen globalVarTable (FuncGdef {ident=ident@(Ident name), params, retTy, bodyExpr}) = do
+  -- Variable of parameters
+  let paramVarTable = Map.fromList [(ident, LVarIdentInfo{ty=ty, localName=genParamName ident}) | Param{ident, ty} <- params]
+  -- Generate LLVM parameters
+  let llvmParams    = [AST.Global.Parameter (tyToLLVMTy ty) (genParamName ident) [] | Param{ident, ty} <- params]
   -- Evaluate bodyExpr
-  let operandEither = exprToOperandEither globalVarTable bodyExpr
+  let operandEither = exprToOperandEither globalVarTable [paramVarTable] bodyExpr
   -- Get operand and env
   (bodyOperand, ExprCodegenEnv{basicBlocks, stackedInstrs, stackedLabels=[lastLabel]}) <- GdefCodegen (Monad.Trans.lift operandEither)
 
@@ -447,7 +455,7 @@ gdefToGdefCodegen globalVarTable (FuncGdef {ident=ident@(Ident name), params, re
   -- NOTE: Should avoid to using PLATY_GLOBAL_RES if an user uses this name then fail
   let funcDef = AST.GlobalDefinition AST.Global.functionDefaults
         { AST.Global.name        = funcName
-        , AST.Global.parameters  =([], False)
+        , AST.Global.parameters  =(llvmParams, False)
         , AST.Global.returnType  = llvmRetTy
         , AST.Global.basicBlocks = basicBlocks ++ [restBasicBlock]
         }
