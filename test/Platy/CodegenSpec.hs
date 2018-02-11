@@ -81,4 +81,35 @@ spec = do
       stdout <- TestUtils.execGdefs [gdef1]
       -- Compare with expectation
       stdout `shouldBe` "8877\n"
-  return ()
+
+    it "global-identifier main" $ do
+      -- [corresponding platy code] NOTE: Syntax maybe wrong
+      -- (@global-let gval1 Int 29292)
+      -- (@global-let main Unit
+      --    (print-int gval1)
+      -- )
+      let gdef1 = LetGdef
+                  { bind =
+                    Bind
+                    { ident = Ident "gval1"
+                    , ty = IntTy
+                    , bodyExpr = LitExpr $ IntLit 29292
+                    }
+                  }
+      let gdef2 = FuncGdef
+                    { ident = Ident "main"
+                    , params = []
+                    , retTy = UnitTy
+                    , bodyExpr =
+                      ApplyExpr
+                      { calleeIdent = Ident "print-int"
+                      , argExprs =
+                        [ IdentExpr $ Ident "gval1"
+                        ]
+                      }
+                    }
+
+      -- Execute and Get stdout
+      stdout <- TestUtils.execGdefs [gdef1, gdef2]
+      -- Compare with expectation
+      stdout `shouldBe` "29292\n"
