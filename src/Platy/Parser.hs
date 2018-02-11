@@ -103,7 +103,7 @@ litP = intLitP <|> boolLitP <|> charLitP <|> unitLitP
 
 -- | Parser of expression
 exprP :: Parsec String u Expr
-exprP = Parsec.try litExprP <|> identExprP <|> betweenParens (ifExprP <|> applyExprP)
+exprP = Parsec.try litExprP <|> identExprP <|> betweenParens (applyExprP <|> (ParsecChar.char keywordPrefixChar *> (ifExprP <|> letExprP)))
   where
     -- | Parser of literal expression
     litExprP = do
@@ -118,7 +118,7 @@ exprP = Parsec.try litExprP <|> identExprP <|> betweenParens (ifExprP <|> applyE
     -- | Parser of if expression
     ifExprP = do
       -- @if
-      ParsecChar.string (keywordPrefixChar:"if") -- TODO: Hard code
+      ParsecChar.string ("if") -- TODO: Hard code
       Parsec.skipMany1 skipLangSpaceP
       -- condition expression
       condExpr <- exprP
@@ -129,6 +129,24 @@ exprP = Parsec.try litExprP <|> identExprP <|> betweenParens (ifExprP <|> applyE
       -- else expression
       elseExpr <- exprP
       return IfExpr {condExpr, thenExpr, elseExpr}
+
+    -- | Parser of let-expression
+    letExprP = do
+      -- let
+      ParsecChar.string "let" -- TODO: Hard code
+      Parsec.skipMany1 skipLangSpaceP
+      -- identifier
+      ident <- identP
+      Parsec.skipMany1 skipLangSpaceP
+      -- type
+      ty   <- tyP
+      Parsec.skipMany1 skipLangSpaceP
+      -- binds
+      binds <- listP (betweenParens (ParsecChar.string "::" *> bindP)) -- TODO: Hard code
+      Parsec.skipMany1 skipLangSpaceP
+       -- expression
+      inExpr <- exprP
+      return $ LetExpr {binds, inExpr}
 
     -- | Parser of apply expression
     applyExprP = do
@@ -150,7 +168,19 @@ paramP = betweenParens $ do
   ty   <- tyP
   return Param{ident, ty}
 
-
+-- | Parser of bind
+bindP :: Parsec String u Bind
+bindP = do
+  Parsec.skipMany1 skipLangSpaceP
+  -- identifier
+  ident <- identP
+  Parsec.skipMany1 skipLangSpaceP
+  -- type
+  ty   <- tyP
+  Parsec.skipMany1 skipLangSpaceP
+  -- expression
+  bodyExpr <- exprP
+  return $ Bind{ident, ty, bodyExpr}
 
 -- | Parser of Global Definition
 gdefP :: Parsec String u Gdef
@@ -159,16 +189,9 @@ gdefP = betweenParens (ParsecChar.char keywordPrefixChar *> (letGdefP <|> funcGd
     letGdefP  = do
       -- @global-let
       ParsecChar.string "global-let" -- TODO: Hard code
-      Parsec.skipMany1 skipLangSpaceP
-      -- identifier
-      ident <- identP
-      Parsec.skipMany1 skipLangSpaceP
-      -- type
-      ty   <- tyP
-      Parsec.skipMany1 skipLangSpaceP
-      -- expression
-      bodyExpr <- exprP
-      return $ LetGdef {bind=Bind{ident, ty, bodyExpr}}
+      -- Bind
+      bind <- bindP
+      return $ LetGdef {bind}
 
     funcGdefP = do
       -- @func

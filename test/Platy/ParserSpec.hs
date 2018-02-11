@@ -49,12 +49,37 @@ spec = do
       Parsec.parse exprP "" "myVar" `shouldBe` expect
 
     it "(myfunc [78]) - Apply" $ do
-      let expect = Right $ ApplyExpr {calleeIdent=(Ident "myfunc"), argExprs=[LitExpr (IntLit 78)]}
+      let expect = Right $ ApplyExpr
+                           { calleeIdent = (Ident "myfunc")
+                           , argExprs = [LitExpr (IntLit 78)]
+                           }
       Parsec.parse exprP "" "(myfunc [78])" `shouldBe` expect
 
     it "(@if True 5544 2299)" $ do
-      let expect = Right $ IfExpr {condExpr=LitExpr $ BoolLit True, thenExpr=LitExpr $ IntLit 5544, elseExpr=LitExpr $ IntLit 2299}
+      let expect = Right $ IfExpr
+                           { condExpr = LitExpr $ BoolLit True
+                           , thenExpr = LitExpr $ IntLit 5544
+                           , elseExpr = LitExpr $ IntLit 2299
+                           }
       Parsec.parse exprP "" "(@if True 5544 2299)" `shouldBe` expect
+
+    it "let-expression" $ do
+      let expect = Right $ LetExpr
+                           { binds =
+                             [ Bind
+                               { ident = Ident "a"
+                               , ty = IntTy
+                               , bodyExpr = LitExpr $ IntLit 2233
+                               }
+                             , Bind
+                               { ident = Ident "b"
+                               , ty = CharTy
+                               , bodyExpr = LitExpr $ CharLit 'f'
+                               }
+                             ]
+                           , inExpr = IdentExpr $ Ident "a"
+                           }
+      Parsec.parse exprP "" "(@let myVar Int [(:: a Int 2233) (:: b Char 'f')] a)" `shouldBe` expect
 
 
   describe "Parse Global Definition" $ do
