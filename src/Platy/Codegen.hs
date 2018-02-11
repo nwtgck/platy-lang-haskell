@@ -62,7 +62,7 @@ litToTy (UnitLit)   = UnitTy
 -- | Expr => LLVM Type
 exprToTy :: VarTable -> [VarTable] -> Expr -> Either ErrorType Ty
 exprToTy gVarTable lVarTables (LitExpr lit)       = return $ litToTy lit
-exprToTy gVarTable lVarTables (IdentExpr (ident@(Ident name)))   = do
+exprToTy gVarTable lVarTables (IdentExpr (ident@(Ident name))) = do
   let identInfoMaybe = lookupLVarTables ident lVarTables <|> Map.lookup ident gVarTable
       notFoundMsg  = [Here.i| Identifier '${name}' is not found|]
   -- Get identifier information
@@ -72,7 +72,15 @@ exprToTy gVarTable lVarTables (IdentExpr (ident@(Ident name)))   = do
      LVarIdentInfo{ty} -> return ty
      FuncIdentInfo{}   -> fail [Here.i| Identifier '${name}' should be variable not function|]
 exprToTy gVarTable lVarTables (IfExpr {thenExpr}) = exprToTy gVarTable lVarTables thenExpr
-exprToTy gVarTable lVarTables (ApplyExpr{})       = undefined -- TODO impl
+exprToTy gVarTable lVarTables (ApplyExpr{calleeIdent=calleeIdent@(Ident name)}) = do
+  let identInfoMaybe = Map.lookup calleeIdent gVarTable
+      notFoundMsg    = [Here.i| Identifier '${name}' is not found|]
+  -- Get identifier information
+  identInfo <- Either.Utils.maybeToEither notFoundMsg identInfoMaybe
+  case identInfo of
+    GVarIdentInfo{}      -> fail [Here.i| Identifier '${name}' should be function, but variable|]
+    LVarIdentInfo{}      -> fail [Here.i| Unexpected error: '${name}' should be global function|]
+    FuncIdentInfo{retTy} -> return retTy
 exprToTy gVarTable lVarTables (LetExpr{inExpr})   = exprToTy gVarTable lVarTables inExpr
 
 
@@ -279,6 +287,15 @@ exprToExprCodegen (ifexpr@IfExpr {condExpr, thenExpr, elseExpr}) = do
       elseLabel   = AST.Name (strToShort [Here.i|${labelPrefix}/else|])
       endLabel    = AST.Name (strToShort [Here.i|${labelPrefix}/end|])
 
+  -- Get global variable table
+  gVarTable  <- gets globalVarTable
+  -- Get local variable tables
+  lVarTables <- gets localVarTables
+  -- Get type
+  ty         <- ExprCodegen $ Monad.Trans.lift (exprToTy gVarTable lVarTables ifexpr)
+  -- Get LLVM type
+  let llvmTy = tyToLLVMTy ty
+
   -- ==== Condition ====
   -- Eval condExpr to Operand
   condOperand <- exprToExprCodegen condExpr
@@ -310,13 +327,8 @@ exprToExprCodegen (ifexpr@IfExpr {condExpr, thenExpr, elseExpr}) = do
 
   -- ==== End-if ====
   addLabel (endLabel)
-  stackInstruction (endValueName := [Quote.LLVM.lli|phi i32 [$id:thenValueName, $id:thenLabel], [$id:elseValueName, $id:elseLabel]|])
+  stackInstruction (endValueName := [Quote.LLVM.lli|phi $type:llvmTy [$id:thenValueName, $id:thenLabel], [$id:elseValueName, $id:elseLabel]|])
 
-
-  gVarTable  <- gets globalVarTable
-  lVarTables <- gets localVarTables
-  ty         <- ExprCodegen $ Monad.Trans.lift (exprToTy gVarTable lVarTables ifexpr)
-  let llvmTy = tyToLLVMTy ty
   return $ AST.LocalReference llvmTy endValueName
 
 

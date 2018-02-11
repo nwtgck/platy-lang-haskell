@@ -126,6 +126,40 @@ spec = do
       -- Compare with expectation
       stdout `shouldBe` "330055\n"
 
+
+    it "print func in if main" $ do
+      -- [corresponding platy code] NOTE: Syntax maybe wrong
+      -- (@global-let main Unit
+      --    (@if True
+      --      (print-int 339911)
+      --      (print-int 220022)
+      --    )
+      -- )
+      let gdef1 = FuncGdef
+                  { ident = Ident "main"
+                  , params = []
+                  , retTy = UnitTy
+                  , bodyExpr =
+                    IfExpr
+                    { condExpr = LitExpr $ BoolLit True
+                    , thenExpr =
+                      ApplyExpr
+                      { calleeIdent = Ident "print-int"
+                      , argExprs = [LitExpr $ IntLit 339911]
+                      }
+                    , elseExpr =
+                      ApplyExpr
+                      { calleeIdent = Ident "print-int"
+                      , argExprs = [LitExpr $ IntLit 220022]
+                      }
+                    }
+                  }
+      -- Execute and Get stdout
+      stdout <- TestUtils.execGdefs [gdef1]
+      -- Compare with expectation
+      stdout `shouldBe` "339911\n"
+
+
     it "global-identifier main" $ do
       -- [corresponding platy code] NOTE: Syntax maybe wrong
       -- (@global-let gval1 Int 29292)
