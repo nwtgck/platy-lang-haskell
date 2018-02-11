@@ -30,8 +30,12 @@ main = hspec spec
 
 spec :: Spec
 spec = do
-  describe "Execution Test" $
-    it "simple print main" $ do
+  describe "Execution Test" $ do
+    it "simple-print main" $ do
+      -- [corresponding platy code] NOTE: Syntax maybe wrong
+      -- (@global-let main Unit
+      --    (print-int 171717)
+      -- )
       let gdef1 = FuncGdef
                    { ident = Ident "main"
                    , params = []
@@ -43,12 +47,38 @@ spec = do
                      }
                    }
 
-      -- Generate LLVM module
-      let Right llvmMod1 = gdefsToModule [gdef1]
-      -- Generate object byte string
-      objBString <- toObjByteString llvmMod1
       -- Execute and Get stdout
-      stdout <- TestUtils.execModule llvmMod1
-      -- Compare with exepect
+      stdout <- TestUtils.execGdefs [gdef1]
+      -- Compare with expectation
       stdout `shouldBe` "171717\n"
+
+    it "if-true main" $ do
+      -- [corresponding platy code] NOTE: Syntax maybe wrong
+      -- (@global-let main Unit
+      --    (print-int (@if True
+      --      8877
+      --      5566
+      --    ))
+      -- )
+      let gdef1 = FuncGdef
+                    { ident = Ident "main"
+                    , params = []
+                    , retTy = UnitTy
+                    , bodyExpr =
+                      ApplyExpr
+                      { calleeIdent = Ident "print-int"
+                      , argExprs =
+                        [ IfExpr
+                          { condExpr = LitExpr $ BoolLit True
+                          , thenExpr = LitExpr $ IntLit 8877
+                          , elseExpr = LitExpr $ IntLit 5566
+                          }
+                        ]
+                      }
+                    }
+
+      -- Execute and Get stdout
+      stdout <- TestUtils.execGdefs [gdef1]
+      -- Compare with expectation
+      stdout `shouldBe` "8877\n"
   return ()
