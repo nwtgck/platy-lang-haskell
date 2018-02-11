@@ -177,11 +177,10 @@ exprToExprCodegen (IdentExpr ident@(Ident name)) = do
   -- Get global variable table
   gVarTable  <- gets globalVarTable
   -- Find ident from tables
-  -- TODO: Rename to identInfoMaybe
-  let varInfoMaybe = lookupLVarTables ident lVarTables <|> Map.lookup ident gVarTable
-      notFoundMsg  = [Here.i| Identifier '${name}' is not found|]
+  let identInfoMaybe = lookupLVarTables ident lVarTables <|> Map.lookup ident gVarTable
+      notFoundMsg    = [Here.i| Identifier '${name}' is not found|]
   -- Get identifier information
-  indentInfo <- ExprCodegen $ Monad.Trans.lift $ Either.Utils.maybeToEither notFoundMsg varInfoMaybe
+  indentInfo <- ExprCodegen $ Monad.Trans.lift $ Either.Utils.maybeToEither notFoundMsg identInfoMaybe
   case indentInfo of
     GVarIdentInfo{ty, globalPtrName} -> do
       let llvmTy    = tyToLLVMTy ty
