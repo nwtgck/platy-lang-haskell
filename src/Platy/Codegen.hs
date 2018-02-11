@@ -11,6 +11,7 @@ import Control.Monad.State
 import qualified Data.Char
 import qualified Data.String.Here as Here
 import Control.Monad (mapM_)
+import Control.Monad as Monad
 import Data.String      (IsString(..))
 import qualified Data.Map as Map
 import Data.Map (Map)
@@ -449,7 +450,9 @@ gdefToGdefCodegen globalVarTable (FuncGdef {ident=ident@(Ident name), params, re
   -- Get operand and env
   (bodyOperand, ExprCodegenEnv{basicBlocks, stackedInstrs, stackedLabels=[lastLabel]}) <- GdefCodegen (Monad.Trans.lift operandEither)
 
-  let funcName  = genFuncName ident
+  let funcName  = if (ident == entrypointFuncIdent)
+                    then langEntrypointFuncName
+                    else genFuncName ident
       llvmRetTy = tyToLLVMTy retTy
 
   -- NOTE: Should avoid to using PLATY_GLOBAL_RES if an user uses this name then fail
@@ -479,6 +482,16 @@ gdefToGdefCodegen globalVarTable (FuncGdef {ident=ident@(Ident name), params, re
 --        |]
   -- Add to the definitions
   addDefinition funcDef
+
+  Monad.when (ident == entrypointFuncIdent) $ do
+    let mainDef = [Quote.LLVM.lldef|
+      define i32 @main(){
+        call i1 $gid:langEntrypointFuncName()
+        ret i32 0
+      }
+    |]
+    addDefinition (mainDef)
+
 
   return ()
 

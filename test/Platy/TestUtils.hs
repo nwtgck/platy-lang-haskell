@@ -53,6 +53,9 @@ execGdefs gdefs = do
   Monad.when False $
     -- Print module
     TIO.putStrLn (LLVM.Pretty.ppllvm llvmMod)
+  Monad.when False $
+    -- Print module
+    toLLVM (llvmMod)
   -- Generate object byte string
   objBString <- toObjByteString llvmMod
   -- Execute and Get stdout
