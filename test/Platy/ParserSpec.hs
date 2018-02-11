@@ -68,3 +68,12 @@ spec = do
                              }
                            }
       Parsec.parse gdefP "" "(@global-let myGlobal Int 445544)" `shouldBe` expect
+
+    it "@func" $ do
+      let expect = Right $ FuncGdef
+                            { ident = Ident "myfunc"
+                            , params = [Param {ident=Ident "a", ty=IntTy}, Param {ident=Ident "b", ty=CharTy}]
+                            , retTy = IntTy
+                            , bodyExpr = IdentExpr $ Ident "a"
+                            }
+      Parsec.parse gdefP "" "(@func myfunc [(:: a Int) (:: b Char)] Int a)" `shouldBe` expect

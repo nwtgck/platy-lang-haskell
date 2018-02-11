@@ -137,6 +137,20 @@ exprP = Parsec.try litExprP <|> identExprP <|> betweenParens (ifExprP <|> applyE
       argExprs <- listP exprP
       return ApplyExpr {calleeIdent, argExprs}
 
+-- Parser of param
+paramP :: Parsec String u Param
+paramP = betweenParens $ do
+  -- ::
+  ParsecChar.string "::" -- TODO: Hard code
+  Parsec.skipMany1 skipLangSpaceP
+  -- identifier
+  ident <- identP
+  Parsec.skipMany1 skipLangSpaceP
+  -- type
+  ty   <- tyP
+  return Param{ident, ty}
+
+
 
 -- | Parser of Global Definition
 gdefP :: Parsec String u Gdef
@@ -156,4 +170,20 @@ gdefP = betweenParens (ParsecChar.char keywordPrefixChar *> (letGdefP <|> funcGd
       bodyExpr <- exprP
       return $ LetGdef {bind=Bind{ident, ty, bodyExpr}}
 
-    funcGdefP = undefined -- TODO: Impl
+    funcGdefP = do
+      -- @func
+      ParsecChar.string "func" -- TODO: Hard code
+      Parsec.skipMany1 skipLangSpaceP
+      -- identifier
+      ident <- identP
+      Parsec.skipMany1 skipLangSpaceP
+      -- parameters
+      params <- listP paramP
+      Parsec.skipMany1 skipLangSpaceP
+      -- type
+      retTy  <- tyP
+      Parsec.skipMany1 skipLangSpaceP
+      -- expression
+      bodyExpr <- exprP
+      return $ FuncGdef {ident, params, retTy, bodyExpr}
+
