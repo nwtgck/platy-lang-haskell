@@ -113,3 +113,58 @@ spec = do
       stdout <- TestUtils.execGdefs [gdef1, gdef2]
       -- Compare with expectation
       stdout `shouldBe` "29292\n"
+
+    it "local-identifier main" $ do
+      -- [corresponding platy code] NOTE: Syntax maybe wrong
+      -- (@global-let gval1 Int 29292)
+      -- (@global-let main Unit
+      --    (@let [
+      --      (= a Int 9898)
+      --      (= b Int 21212)
+      --      (= __dummy1__ Unit (print-int a))
+      --      (= __dummy2__ Unit (print-int b))
+      --    ] Unit)
+      -- )
+      let gdef1 = FuncGdef
+                  { ident = Ident "main"
+                  , params = []
+                  , retTy = UnitTy
+                  , bodyExpr =
+                    LetExpr
+                    { binds =
+                      [ Bind
+                        { ident = Ident "a"
+                        , ty = IntTy
+                        , bodyExpr = LitExpr $ IntLit 9898
+                        }
+                      , Bind
+                        { ident = Ident "b"
+                        , ty = IntTy
+                        , bodyExpr = LitExpr $ IntLit 21212
+                        }
+                      , Bind
+                        { ident = Ident "__dummy1__"
+                        , ty = UnitTy
+                        , bodyExpr =
+                          ApplyExpr
+                          { calleeIdent = Ident "print-int"
+                          , argExprs = [IdentExpr $ Ident "a"]
+                          }
+                        }
+                      , Bind
+                        { ident = Ident "__dummy2__"
+                        , ty = UnitTy
+                        , bodyExpr =
+                          ApplyExpr
+                          { calleeIdent = Ident "print-int"
+                          , argExprs = [IdentExpr $ Ident "b"]
+                          }
+                        }
+                      ]
+                    , inExpr = LitExpr UnitLit
+                    }
+                  }
+      -- Execute and Get stdout
+      stdout <- TestUtils.execGdefs [gdef1]
+      -- Compare with expectation
+      stdout `shouldBe` "9898\n21212\n"
