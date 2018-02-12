@@ -40,8 +40,12 @@ data Expr =
 data Param = Param {ident :: Ident, ty :: Ty}
   deriving (Show, Eq)
 
--- Global definition
+-- | Global definition
 data Gdef =
   LetGdef  {bind :: Bind} |
   FuncGdef {ident :: Ident, params :: [Param], retTy :: Ty, bodyExpr :: Expr}
+  deriving (Show, Eq)
+
+-- | Program (maybe rename to Module or Package)
+data Program = Program {gdefs :: [Gdef]}
   deriving (Show, Eq)

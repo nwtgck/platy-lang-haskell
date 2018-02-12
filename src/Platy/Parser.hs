@@ -204,3 +204,10 @@ gdefP = betweenParens (ParsecChar.char keywordPrefixChar *> (letGdefP <|> funcGd
       bodyExpr <- exprP
       return $ FuncGdef {ident, params, retTy, bodyExpr}
 
+
+-- | Parser of program
+programP :: Parsec String u Program
+programP = do
+  Parsec.skipMany skipLangSpaceP
+  gdefs <- Parsec.many (gdefP <* Parsec.many skipLangSpaceP)
+  return $ Program {gdefs}

@@ -9,18 +9,8 @@ import           Test.Hspec.QuickCheck
 import           Test.QuickCheck
 
 import qualified Data.String.Here as Here
-import qualified Data.ByteString.Char8 as BS
-import qualified Data.Text.Lazy.IO as TIO
-import qualified Data.ByteString as ByteString
-import qualified Data.Map as Map
-import Data.Map (Map)
-
-import qualified LLVM.Pretty
-
-import Debug.Trace
 
 import Platy.Datatypes
-import Platy.Codegen
 import Platy.Utils
 import Platy.Parser
 import qualified Platy.TestUtils as  TestUtils
@@ -102,3 +92,72 @@ spec = do
                             , bodyExpr = IdentExpr $ Ident "a"
                             }
       Parsec.parse gdefP "" "(@func myfunc [(:: a Int) (:: b Char)] Int a)" `shouldBe` expect
+
+
+  describe "Parse Program" $ do
+    it "empty program" $ do
+      let expect = Right Program {gdefs=[]}
+      let code   = ""
+      Parsec.parse programP "" code `shouldBe` expect
+
+    it "multi definitions" $ do
+        let expect = Right Program
+                            { gdefs =
+                              [ LetGdef
+                                { bind =
+                                  Bind
+                                  { ident = Ident "a"
+                                  , ty = IntTy
+                                  , bodyExpr = LitExpr $ IntLit 8989
+                                  }
+                                }
+                              , LetGdef
+                                { bind =
+                                  Bind
+                                  { ident = Ident "b"
+                                  , ty = IntTy
+                                  , bodyExpr = LitExpr $ IntLit 12121
+                                  }
+                                }
+                              ]
+                            }
+        let code = [Here.here|
+
+(@global-let a Int 8989)
+
+(@global-let b Int 12121)
+
+|]
+        Parsec.parse programP "" code `shouldBe` expect
+
+
+    it "multi definitions with comments" $ do
+        let expect = Right Program
+                            { gdefs =
+                              [ LetGdef
+                                { bind =
+                                  Bind
+                                  { ident = Ident "a"
+                                  , ty = IntTy
+                                  , bodyExpr = LitExpr $ IntLit 8989
+                                  }
+                                }
+                              , LetGdef
+                                { bind =
+                                  Bind
+                                  { ident = Ident "b"
+                                  , ty = IntTy
+                                  , bodyExpr = LitExpr $ IntLit 12121
+                                  }
+                                }
+                              ]
+                            }
+        let code = [Here.here|
+
+; Global variable (this is a comment)
+(@global-let a Int 8989)
+
+
+(@global-let b Int 12121) ; This is global variable
+|]
+        Parsec.parse programP "" code `shouldBe` expect
