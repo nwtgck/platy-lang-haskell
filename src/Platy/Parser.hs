@@ -74,7 +74,7 @@ listP :: Parsec String u a -> Parsec String u [a]
 listP p = do
   ParsecChar.char '['
   Parsec.skipMany skipLangSpaceP
-  as <- Parsec.sepBy p (Parsec.skipMany1 skipLangSpaceP)
+  as <- Parsec.sepBy (p) (ParsecChar.char ',' *> Parsec.skipMany skipLangSpaceP)
   Parsec.skipMany skipLangSpaceP
   ParsecChar.char ']'
   return as

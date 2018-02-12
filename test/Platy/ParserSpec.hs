@@ -69,7 +69,7 @@ spec = do
                              ]
                            , inExpr = IdentExpr $ Ident "a"
                            }
-      Parsec.parse exprP "" "(@let [(= a Int 2233) (= b Char 'f')] a)" `shouldBe` expect
+      Parsec.parse exprP "" "(@let [(= a Int 2233), (= b Char 'f')] a)" `shouldBe` expect
 
 
   describe "Parse Global Definition" $ do
@@ -91,7 +91,7 @@ spec = do
                             , retTy = IntTy
                             , bodyExpr = IdentExpr $ Ident "a"
                             }
-      Parsec.parse gdefP "" "(@func myfunc [(:: a Int) (:: b Char)] Int a)" `shouldBe` expect
+      Parsec.parse gdefP "" "(@func myfunc [(:: a Int), (:: b Char)] Int a)" `shouldBe` expect
 
 
   describe "Parse Program" $ do
