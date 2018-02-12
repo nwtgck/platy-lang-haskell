@@ -48,7 +48,8 @@ install:
 script:
 - stack setup
 - stack build
-# ==== THIS IS FOR JUST WORKING TEST ====
-- stack exec platy-lang-exe
 # Test
 - stack test
+# Working test of compiler
+- stack exec platyc -- ./platy_programs/should_pass/fib.platy
+- ./fib
