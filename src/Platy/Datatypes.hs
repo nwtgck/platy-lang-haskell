@@ -9,7 +9,7 @@ data Lit =
   CharLit Char |
   BoolLit Bool |
   UnitLit
-  deriving (Show)
+  deriving (Show, Eq)
 
 -- | Identifier
 data Ident = Ident String
@@ -21,11 +21,11 @@ data Ty =
   CharTy |
   BoolTy |
   UnitTy
-  deriving (Show)
+  deriving (Show, Eq)
 
 -- | Bind (definition)
 data Bind = Bind {ident :: Ident, ty :: Ty, bodyExpr :: Expr}
-  deriving (Show)
+  deriving (Show, Eq)
 
 -- | Expression
 data Expr =
@@ -34,14 +34,18 @@ data Expr =
   IfExpr {condExpr :: Expr, thenExpr :: Expr, elseExpr :: Expr} |
   ApplyExpr {calleeIdent :: Ident, argExprs :: [Expr]} |
   LetExpr {binds :: [Bind], inExpr :: Expr}
-  deriving (Show)
+  deriving (Show, Eq)
 
 -- | Parameter
 data Param = Param {ident :: Ident, ty :: Ty}
-  deriving (Show)
+  deriving (Show, Eq)
 
--- Global definition
+-- | Global definition
 data Gdef =
   LetGdef  {bind :: Bind} |
   FuncGdef {ident :: Ident, params :: [Param], retTy :: Ty, bodyExpr :: Expr}
-  deriving (Show)
+  deriving (Show, Eq)
+
+-- | Program (maybe rename to Module or Package)
+data Program = Program {gdefs :: [Gdef]}
+  deriving (Show, Eq)
