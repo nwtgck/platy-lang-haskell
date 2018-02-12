@@ -13,6 +13,7 @@ import qualified System.Process as Process
 import qualified Data.ByteString as ByteString
 import qualified Text.Parsec      as Parsec
 import qualified System.FilePath.Posix as FilePath.Posix
+import qualified Control.Monad as Monad
 
 import Platy.Datatypes
 import Platy.Codegen
@@ -20,7 +21,8 @@ import Platy.Utils
 import Platy.Parser
 
 data PlatyOptions = PlatyOptions
-  { emitLLVM      :: Bool
+  { quiet         :: Bool
+  , emitLLVM      :: Bool
   , platyFilePath :: FilePath
   }
 
@@ -28,6 +30,13 @@ data PlatyOptions = PlatyOptions
 platyOptionsP :: OptApplicative.Parser PlatyOptions
 platyOptionsP = PlatyOptions
     <$>
+    (
+      OptApplicative.switch $ mconcat [
+        OptApplicative.long "quiet",
+        OptApplicative.help "quiet (no output)"
+      ]
+    )
+    <*>
     (
       OptApplicative.switch $ mconcat [
         OptApplicative.long "emit-llvm",
@@ -48,7 +57,7 @@ platyOptionsPInfo = OptApplicative.info (OptApplicative.helper <*> platyOptionsP
 main :: IO ()
 main = do
   -- Parse options
-  PlatyOptions{platyFilePath, emitLLVM} <- OptApplicative.execParser platyOptionsPInfo
+  PlatyOptions{platyFilePath, emitLLVM, quiet} <- OptApplicative.execParser platyOptionsPInfo
   -- Get code string
   platyCode <- readFile platyFilePath
   -- Parse code
@@ -76,8 +85,9 @@ main = do
               let execfilePath = FilePath.Posix.takeBaseName platyFilePath
                -- Make executable file
               Process.system [Here.i|gcc ${objfilePath} -o ${execfilePath}|]
+              Monad.when (not quiet) $
               -- Print generated message
-              putStrLn [Here.i|Executable '${execfilePath}' generated|]
+                putStrLn [Here.i|Executable '${execfilePath}' generated|]
               return ()
 
        Left err -> putStrLn err
