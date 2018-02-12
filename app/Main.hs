@@ -15,11 +15,14 @@ import qualified Text.Parsec      as Parsec
 import qualified System.FilePath.Posix as FilePath.Posix
 import qualified Control.Monad as Monad
 import qualified Data.Maybe as Maybe
+import Data.Version (showVersion)
 
 import Platy.Datatypes
 import Platy.Codegen
 import Platy.Utils
 import Platy.Parser
+
+import Paths_platy_lang (version)
 
 data PlatyOptions = PlatyOptions
   { quiet         :: Bool
@@ -62,7 +65,16 @@ platyOptionsP = PlatyOptions
     )
 
 platyOptionsPInfo :: OptApplicative.ParserInfo PlatyOptions
-platyOptionsPInfo = OptApplicative.info (OptApplicative.helper <*> platyOptionsP) OptApplicative.fullDesc
+platyOptionsPInfo = OptApplicative.info (OptApplicative.helper <*> versionP <*> platyOptionsP) OptApplicative.fullDesc
+  where
+    -- (from: https://haskell-lang.org/library/optparse-applicative)
+    versionP :: OptApplicative.Parser (a -> a)
+    versionP = OptApplicative.infoOption (showVersion version)
+                 (mconcat [
+                   OptApplicative.short 'v',
+                   OptApplicative.long "version",
+                   OptApplicative.help "Show version"
+                 ])
 
 main :: IO ()
 main = do
