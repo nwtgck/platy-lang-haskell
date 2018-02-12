@@ -30,7 +30,7 @@ spec :: Spec
 spec = do
   describe "[should pass] Parse & Compile & Run" $ do
     let fileDir         = FilePath.Posix.joinPath ["platy_programs", "should_pass"]
-    let programNames    = ["print_int_29", "print_multi_ints", "eq_int_10_9", "print_multi_add_ints", "print_multi_sub_ints"] -- NOTE: All you have to do is adding here
+    let programNames    = ["print_int_29", "print_multi_ints", "eq_int_10_9", "print_multi_add_ints", "print_multi_sub_ints", "or_True_False"] -- NOTE: All you have to do is adding here
     let platyExtension  = "platy"
     let expectExtension = "expect"
 

@@ -534,6 +534,12 @@ programToModule Program{gdefs} = do
                                    , paramTys = [IntTy, IntTy]
                                    , funcName = AST.Name "sub-int"
                                    })
+                               , ( Ident "or"
+                                 , FuncIdentInfo
+                                   { retTy = BoolTy
+                                   , paramTys = [BoolTy, BoolTy]
+                                   , funcName = AST.Name "or"
+                                   })
                                ]
 
   GdefCodegenEnv{definitions, globalInitFuncs} <- execStateT (runGdefCodegen $ mapM_ (gdefToGdefCodegen (Map.union globalVarMap stdVarMap)) gdefs) initEnv
@@ -560,7 +566,7 @@ programToModule Program{gdefs} = do
       |]
 
   -- TODO: `stdlibDefs` should move to stdlib for Platy
-  let stdlibDefs = [intFormatDef, printfDef, printIntDef, eqIntDef, addIntDef, subIntDef]
+  let stdlibDefs = [intFormatDef, printfDef, printIntDef, eqIntDef, addIntDef, subIntDef, orDef]
         where
           intFormatName = AST.Name "$$PLATY/int_format_str"
           intFormatDef = [Quote.LLVM.lldef|
@@ -646,6 +652,14 @@ programToModule Program{gdefs} = do
             define $type:llvmIntTy @sub-int($type:llvmIntTy %a, $type:llvmIntTy %b){
               %res = sub $type:llvmIntTy %a, %b
               ret $type:llvmIntTy %res
+            }
+          |]
+
+          -- or
+          orDef = [Quote.LLVM.lldef|
+            define $type:llvmBoolTy @or($type:llvmBoolTy %a, $type:llvmBoolTy %b){
+              %res = or $type:llvmBoolTy %a, %b
+              ret $type:llvmBoolTy %res
             }
           |]
 

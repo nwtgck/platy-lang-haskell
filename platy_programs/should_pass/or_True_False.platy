@@ -1,0 +1,6 @@
+(@func main [] Unit
+    (@if (or [True, False])
+        (print-int [4477])
+        (print-int [8811])
+    )
+)
