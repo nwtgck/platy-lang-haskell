@@ -17,6 +17,25 @@ keywordPrefixChar = '@'
 -- | One-line comment char
 onelineCommentChar = ';'
 
+-- | if
+ifStr = "if"
+
+-- | local let
+localLetStr = "let"
+
+-- | Bind begging string in let-expression
+bindBeginInLetStr = "::"
+
+-- | Param begging string
+paramBeginStr = "::"
+
+-- | global-let
+globalLetStr = "global-let"
+
+-- | Func
+funcStr = "func"
+
+
 -- | Int type name
 intTyNameStr = "Int"
 
@@ -118,7 +137,7 @@ exprP = litExprP <|> identExprP <|> betweenParens (applyExprP <|> (ParsecChar.ch
     -- | Parser of if expression
     ifExprP = do
       -- @if
-      ParsecChar.string ("if") -- TODO: Hard code
+      ParsecChar.string ifStr
       Parsec.skipMany1 skipLangSpaceP
       -- condition expression
       condExpr <- exprP
@@ -133,10 +152,10 @@ exprP = litExprP <|> identExprP <|> betweenParens (applyExprP <|> (ParsecChar.ch
     -- | Parser of let-expression
     letExprP = do
       -- let
-      ParsecChar.string "let" -- TODO: Hard code
+      ParsecChar.string localLetStr
       Parsec.skipMany1 skipLangSpaceP
       -- binds
-      binds <- listP (betweenParens (ParsecChar.string "::" *> Parsec.skipMany1 skipLangSpaceP *> bindP)) -- TODO: Hard code
+      binds <- listP (betweenParens (ParsecChar.string bindBeginInLetStr *> Parsec.skipMany1 skipLangSpaceP *> bindP))
       Parsec.skipMany1 skipLangSpaceP
        -- expression
       inExpr <- exprP
@@ -153,7 +172,7 @@ exprP = litExprP <|> identExprP <|> betweenParens (applyExprP <|> (ParsecChar.ch
 paramP :: Parsec String u Param
 paramP = betweenParens $ do
   -- ::
-  ParsecChar.string "::" -- TODO: Hard code
+  ParsecChar.string paramBeginStr
   Parsec.skipMany1 skipLangSpaceP
   -- identifier
   ident <- identP
@@ -180,8 +199,8 @@ gdefP :: Parsec String u Gdef
 gdefP = betweenParens (ParsecChar.char keywordPrefixChar *> (letGdefP <|> funcGdefP))
   where
     letGdefP  = do
-      -- @global-let
-      ParsecChar.string "global-let" -- TODO: Hard code
+      -- global-let
+      ParsecChar.string globalLetStr
       Parsec.skipMany1 skipLangSpaceP
       -- Bind
       bind <- bindP
@@ -189,7 +208,7 @@ gdefP = betweenParens (ParsecChar.char keywordPrefixChar *> (letGdefP <|> funcGd
 
     funcGdefP = do
       -- @func
-      ParsecChar.string "func" -- TODO: Hard code
+      ParsecChar.string funcStr
       Parsec.skipMany1 skipLangSpaceP
       -- identifier
       ident <- identP
