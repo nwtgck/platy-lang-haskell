@@ -48,7 +48,7 @@ spec = do
                    }
 
       -- Execute and Get stdout
-      stdout <- TestUtils.execGdefs [gdef1]
+      stdout <- TestUtils.execProgram Program{gdefs=[gdef1]}
       -- Compare with expectation
       stdout `shouldBe` "171717\n"
 
@@ -78,7 +78,7 @@ spec = do
                     }
 
       -- Execute and Get stdout
-      stdout <- TestUtils.execGdefs [gdef1]
+      stdout <- TestUtils.execProgram Program{gdefs=[gdef1]}
       -- Compare with expectation
       stdout `shouldBe` "8877\n"
 
@@ -122,7 +122,7 @@ spec = do
                     }
                   }
       -- Execute and Get stdout
-      stdout <- TestUtils.execGdefs [gdef1, gdef2, gdef3]
+      stdout <- TestUtils.execProgram Program{gdefs=[gdef1, gdef2, gdef3]}
       -- Compare with expectation
       stdout `shouldBe` "330055\n"
 
@@ -155,7 +155,7 @@ spec = do
                     }
                   }
       -- Execute and Get stdout
-      stdout <- TestUtils.execGdefs [gdef1]
+      stdout <- TestUtils.execProgram Program{gdefs=[gdef1]}
       -- Compare with expectation
       stdout `shouldBe` "339911\n"
 
@@ -188,7 +188,7 @@ spec = do
                     }
 
       -- Execute and Get stdout
-      stdout <- TestUtils.execGdefs [gdef1, gdef2]
+      stdout <- TestUtils.execProgram Program{gdefs=[gdef1, gdef2]}
       -- Compare with expectation
       stdout `shouldBe` "29292\n"
 
@@ -242,7 +242,7 @@ spec = do
                     }
                   }
       -- Execute and Get stdout
-      stdout <- TestUtils.execGdefs [gdef1]
+      stdout <- TestUtils.execProgram Program{gdefs=[gdef1]}
       -- Compare with expectation
       stdout `shouldBe` "9898\n21212\n"
 
@@ -280,7 +280,7 @@ spec = do
                     }
 
       -- Execute and Get stdout
-      stdout <- TestUtils.execGdefs [gdef1]
+      stdout <- TestUtils.execProgram Program{gdefs=[gdef1]}
       -- Compare with expectation
       stdout `shouldBe` "6633\n"
 
@@ -353,7 +353,7 @@ spec = do
                     }
                   }
       -- Execute and Get stdout
-      stdout <- TestUtils.execGdefs [gdef1]
+      stdout <- TestUtils.execProgram Program{gdefs=[gdef1]}
       -- Compare with expectation
       stdout `shouldBe` "9911\n881122\n"
 
@@ -386,6 +386,6 @@ spec = do
                    }
 
       -- Execute and Get stdout
-      stdout <- TestUtils.execGdefs [gdef1, gdef2]
+      stdout <- TestUtils.execProgram Program{gdefs=[gdef1, gdef2]}
       -- Compare with expectation
       stdout `shouldBe` "3300\n"

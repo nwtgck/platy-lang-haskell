@@ -1,4 +1,5 @@
 {-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE NamedFieldPuns #-}
 
 module Platy.TestUtils where
 
@@ -41,11 +42,12 @@ execModule llvmMod = do
     -- Get stdout
     IO.hGetContents stdoutHandle
 
--- | Convert [Gdef] => Module => Execute it => Stdout
-execGdefs :: [Gdef] -> IO String
-execGdefs gdefs = do
+
+-- | Convert Program => Module => Execute it => Stdout
+execProgram :: Program -> IO String
+execProgram program = do
   -- Generate LLVM module
-  let llvmModEither = gdefsToModule gdefs
+  let llvmModEither = programToModule program
   -- Is right or not
   llvmModEither `shouldSatisfy` Either.isRight
   -- Extract module

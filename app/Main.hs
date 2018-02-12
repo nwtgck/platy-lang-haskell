@@ -37,14 +37,14 @@ main = do
   putStrLn("====================================")
   let gdef1 = LetGdef {bind=Bind {ident=Ident "myint", ty=IntTy, bodyExpr=IfExpr (LitExpr $ BoolLit True) (LitExpr $ IntLit 81818) (LitExpr $ IntLit 23232)}}
   let gdef2 = LetGdef {bind=Bind {ident=Ident "myint2", ty=IntTy, bodyExpr=IfExpr (LitExpr $ BoolLit True) (LitExpr $ IntLit 7117) (LitExpr $ IntLit 9889)}}
-  let Right mod1 = gdefsToModule [gdef1, gdef2]
+  let Right mod1 = programToModule Program{gdefs=[gdef1, gdef2]}
 --  TIO.putStrLn (LLVM.Pretty.ppllvm mod1)
   putStrLn("----------------------------------")
 
   toLLVM mod1
 
   let gdef3 = LetGdef {bind=Bind {ident=Ident "myint", ty=IntTy, bodyExpr=LitExpr $ IntLit 2929}}
-  let mod2Either = gdefsToModule [gdef3]
+  let mod2Either = programToModule Program{gdefs=[gdef3]}
   let Right mod2 = mod2Either
 --  print mod2
   putStrLn("----------------------------------")
@@ -57,39 +57,39 @@ main = do
 
   let gdef4 :: Gdef
       gdef4 = FuncGdef {ident=Ident "myfunc", params=[], retTy=IntTy, bodyExpr=LitExpr $ IntLit 32323}
-  let Right mod3 = gdefsToModule [gdef4]
+  let Right mod3 = programToModule Program{gdefs=[gdef4]}
   toLLVM mod3
   putStrLn("----------------------------------")
 
 
   let gdef5 :: Gdef
       gdef5 = FuncGdef {ident=Ident "myfunc", params=[], retTy=IntTy, bodyExpr=IfExpr (LitExpr $ BoolLit True) (LitExpr $ IntLit 5656) (LitExpr $ IntLit 767)}
-  let Right mod4 = gdefsToModule [gdef5]
+  let Right mod4 = programToModule Program{gdefs=[gdef5]}
   toLLVM mod4
   putStrLn("----------------------------------")
 
 
   let gdef6 = LetGdef {bind=Bind {ident=Ident "myint", ty=IntTy, bodyExpr=LitExpr $ IntLit 8877}}
   let gdef7 = LetGdef {bind=Bind {ident=Ident "myint2", ty=IntTy, bodyExpr=IdentExpr $ Ident "myint"}}
-  let Right mod5 = gdefsToModule [gdef6, gdef7]
+  let Right mod5 = programToModule Program{gdefs=[gdef6, gdef7]}
   toLLVM mod5
   putStrLn("----------------------------------")
 
   let gdef8 = LetGdef {bind=Bind {ident=Ident "value1", ty=IntTy, bodyExpr=LetExpr {binds = [Bind{ident=Ident "a", ty=IntTy, bodyExpr=LitExpr $ IntLit 8989}, Bind{ident=Ident "b", ty=IntTy, bodyExpr=LitExpr $ IntLit 3344}], inExpr=IdentExpr (Ident "a")}}}
-  let Right mod6 = gdefsToModule [gdef8]
+  let Right mod6 = programToModule Program{gdefs=[gdef8]}
   toLLVM mod6
   putStrLn("----------------------------------")
 
 
   let gdef9 = LetGdef {bind=Bind {ident=Ident "value1", ty=IntTy, bodyExpr=LetExpr {binds = [Bind{ident=Ident "a", ty=IntTy, bodyExpr=LitExpr $ IntLit 8989}, Bind{ident=Ident "b", ty=IntTy, bodyExpr=IdentExpr (Ident "a")}], inExpr=IdentExpr (Ident "b")}}}
-  let Right mod7 = gdefsToModule [gdef9]
+  let Right mod7 = programToModule Program{gdefs=[gdef9]}
   toLLVM mod7
   putStrLn("----------------------------------")
   TIO.putStrLn (LLVM.Pretty.ppll mod7)
   putStrLn("----------------------------------")
 
   let gdef11 = FuncGdef {ident=Ident "main", params=[], retTy=UnitTy, bodyExpr=ApplyExpr{calleeIdent=Ident "print-int", argExprs=[LitExpr $ IntLit 171717]}}
-  let Right mod8 = gdefsToModule [gdef11]
+  let Right mod8 = programToModule Program{gdefs=[gdef11]}
   toLLVM mod8
   putStrLn("----------------------------------")
 

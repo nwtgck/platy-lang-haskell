@@ -495,9 +495,10 @@ gdefToGdefCodegen globalVarTable (FuncGdef {ident=ident@(Ident name), params, re
 
   return ()
 
--- | [Gdef] => AST.Module
-gdefsToModule :: [Gdef] -> Either ErrorType AST.Module
-gdefsToModule gdefs = do
+
+-- | Program => AST.Module
+programToModule :: Program -> Either ErrorType AST.Module
+programToModule Program{gdefs} = do
   let initEnv = GdefCodegenEnv {
                   definitions         = []
                 , globalInitFuncs     = []
