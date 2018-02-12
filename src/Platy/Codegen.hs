@@ -508,7 +508,19 @@ programToModule Program{gdefs} = do
       globalVarMap = Map.fromList (fmap f gdefs)
 
       -- TODO: Remove `stdVarMap` in the future
-      stdVarMap = Map.fromList [(Ident "print-int", FuncIdentInfo{retTy=UnitTy, paramTys=[IntTy], funcName=AST.Name "print-int"})]
+      stdVarMap = Map.fromList [ ( Ident "print-int"
+                                 , FuncIdentInfo
+                                   { retTy = UnitTy
+                                   , paramTys = [IntTy]
+                                   , funcName = AST.Name "print-int"
+                                   })
+                               , ( Ident "eq-int"
+                                 , FuncIdentInfo
+                                   { retTy = BoolTy
+                                   , paramTys = [IntTy, IntTy]
+                                   , funcName = AST.Name "eq-int"
+                                   })
+                               ]
 
   GdefCodegenEnv{definitions, globalInitFuncs} <- execStateT (runGdefCodegen $ mapM_ (gdefToGdefCodegen (Map.union globalVarMap stdVarMap)) gdefs) initEnv
 
@@ -534,7 +546,7 @@ programToModule Program{gdefs} = do
       |]
 
   -- TODO: `stdlibDefs` should move to stdlib for Platy
-  let stdlibDefs = [intFormatDef, printfDef, printIntDef]
+  let stdlibDefs = [intFormatDef, printfDef, printIntDef, eqIntDef]
         where
           intFormatName = AST.Name "$$PLATY/int_format_str"
           intFormatDef = [Quote.LLVM.lldef|
@@ -595,6 +607,16 @@ programToModule Program{gdefs} = do
                                   AST.functionAttributes = [],
                                   AST.metadata           = []
                                 }
+          -- eq-int
+          eqIntDef = [Quote.LLVM.lldef|
+            define $type:llvmBoolTy @eq-int($type:llvmIntTy %a, $type:llvmIntTy %b){
+              %res = icmp eq $type:llvmIntTy %a, %b
+              ret $type:llvmBoolTy %res
+            }
+          |]
+            where
+              llvmBoolTy = tyToLLVMTy BoolTy
+              llvmIntTy  = tyToLLVMTy IntTy
 
 
   return AST.defaultModule{
