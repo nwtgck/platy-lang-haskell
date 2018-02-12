@@ -103,7 +103,7 @@ litP = intLitP <|> boolLitP <|> charLitP <|> unitLitP
 
 -- | Parser of expression
 exprP :: Parsec String u Expr
-exprP = Parsec.try litExprP <|> identExprP <|> betweenParens (applyExprP <|> (ParsecChar.char keywordPrefixChar *> (ifExprP <|> letExprP)))
+exprP = litExprP <|> identExprP <|> betweenParens (applyExprP <|> (ParsecChar.char keywordPrefixChar *> (ifExprP <|> letExprP)))
   where
     -- | Parser of literal expression
     litExprP = do
@@ -142,7 +142,7 @@ exprP = Parsec.try litExprP <|> identExprP <|> betweenParens (applyExprP <|> (Pa
       ty   <- tyP
       Parsec.skipMany1 skipLangSpaceP
       -- binds
-      binds <- listP (betweenParens (ParsecChar.string "::" *> bindP)) -- TODO: Hard code
+      binds <- listP (betweenParens (ParsecChar.string "::" *> Parsec.skipMany1 skipLangSpaceP *> bindP)) -- TODO: Hard code
       Parsec.skipMany1 skipLangSpaceP
        -- expression
       inExpr <- exprP
@@ -171,7 +171,6 @@ paramP = betweenParens $ do
 -- | Parser of bind
 bindP :: Parsec String u Bind
 bindP = do
-  Parsec.skipMany1 skipLangSpaceP
   -- identifier
   ident <- identP
   Parsec.skipMany1 skipLangSpaceP
@@ -189,6 +188,7 @@ gdefP = betweenParens (ParsecChar.char keywordPrefixChar *> (letGdefP <|> funcGd
     letGdefP  = do
       -- @global-let
       ParsecChar.string "global-let" -- TODO: Hard code
+      Parsec.skipMany1 skipLangSpaceP
       -- Bind
       bind <- bindP
       return $ LetGdef {bind}
