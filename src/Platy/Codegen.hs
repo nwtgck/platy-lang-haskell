@@ -520,6 +520,13 @@ programToModule Program{gdefs} = do
                                    , paramTys = [IntTy, IntTy]
                                    , funcName = AST.Name "eq-int"
                                    })
+
+                               , ( Ident "add-int"
+                                 , FuncIdentInfo
+                                   { retTy = IntTy
+                                   , paramTys = [IntTy, IntTy]
+                                   , funcName = AST.Name "add-int"
+                                   })
                                ]
 
   GdefCodegenEnv{definitions, globalInitFuncs} <- execStateT (runGdefCodegen $ mapM_ (gdefToGdefCodegen (Map.union globalVarMap stdVarMap)) gdefs) initEnv
@@ -546,7 +553,7 @@ programToModule Program{gdefs} = do
       |]
 
   -- TODO: `stdlibDefs` should move to stdlib for Platy
-  let stdlibDefs = [intFormatDef, printfDef, printIntDef, eqIntDef]
+  let stdlibDefs = [intFormatDef, printfDef, printIntDef, eqIntDef, addIntDef]
         where
           intFormatName = AST.Name "$$PLATY/int_format_str"
           intFormatDef = [Quote.LLVM.lldef|
@@ -607,6 +614,10 @@ programToModule Program{gdefs} = do
                                   AST.functionAttributes = [],
                                   AST.metadata           = []
                                 }
+
+          llvmBoolTy = tyToLLVMTy BoolTy
+          llvmIntTy  = tyToLLVMTy IntTy
+
           -- eq-int
           eqIntDef = [Quote.LLVM.lldef|
             define $type:llvmBoolTy @eq-int($type:llvmIntTy %a, $type:llvmIntTy %b){
@@ -614,9 +625,14 @@ programToModule Program{gdefs} = do
               ret $type:llvmBoolTy %res
             }
           |]
-            where
-              llvmBoolTy = tyToLLVMTy BoolTy
-              llvmIntTy  = tyToLLVMTy IntTy
+
+          -- add-int
+          addIntDef = [Quote.LLVM.lldef|
+            define $type:llvmIntTy @add-int($type:llvmIntTy %a, $type:llvmIntTy %b){
+              %res = add $type:llvmIntTy %a, %b
+              ret $type:llvmIntTy %res
+            }
+          |]
 
 
   return AST.defaultModule{
