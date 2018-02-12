@@ -14,6 +14,7 @@ import qualified Data.ByteString as ByteString
 import qualified Text.Parsec      as Parsec
 import qualified System.FilePath.Posix as FilePath.Posix
 import qualified Control.Monad as Monad
+import qualified Data.Maybe as Maybe
 
 import Platy.Datatypes
 import Platy.Codegen
@@ -23,6 +24,7 @@ import Platy.Parser
 data PlatyOptions = PlatyOptions
   { quiet         :: Bool
   , emitLLVM      :: Bool
+  , outputPathMay :: Maybe FilePath
   , platyFilePath :: FilePath
   }
 
@@ -44,6 +46,14 @@ platyOptionsP = PlatyOptions
       ]
     )
     <*>
+    (
+      OptApplicative.optional $ OptApplicative.strOption $ mconcat [
+        OptApplicative.short 'o',
+        OptApplicative.long "output",
+        OptApplicative.help "output file path"
+      ]
+    )
+    <*>
     (OptApplicative.strArgument $ mconcat
       [ OptApplicative.help ".platy file"
       , OptApplicative.metavar "PLATY_FILE"
@@ -57,7 +67,7 @@ platyOptionsPInfo = OptApplicative.info (OptApplicative.helper <*> platyOptionsP
 main :: IO ()
 main = do
   -- Parse options
-  PlatyOptions{platyFilePath, emitLLVM, quiet} <- OptApplicative.execParser platyOptionsPInfo
+  PlatyOptions{platyFilePath, emitLLVM, quiet, outputPathMay} <- OptApplicative.execParser platyOptionsPInfo
   -- Get code string
   platyCode <- readFile platyFilePath
   -- Parse code
@@ -82,7 +92,7 @@ main = do
               -- Save obj to a file
               ByteString.writeFile objfilePath objBString
               -- Create empty executable file
-              let execfilePath = FilePath.Posix.takeBaseName platyFilePath
+              let execfilePath = Maybe.fromMaybe (FilePath.Posix.takeBaseName platyFilePath) outputPathMay
                -- Make executable file
               Process.system [Here.i|gcc ${objfilePath} -o ${execfilePath}|]
               Monad.when (not quiet) $
