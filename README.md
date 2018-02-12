@@ -14,14 +14,34 @@ It was designed to realize the following three ideas.
 | [`master`](https://github.com/nwtgck/platy-lang-haskell/tree/master) | [![Build Status](https://travis-ci.com/nwtgck/platy-lang-haskell.svg?token=TuxNpqznwwyy7hyJwBVm&branch=master)](https://travis-ci.com/nwtgck/platy-lang-haskell) |
 | [`develop`](https://github.com/nwtgck/platy-lang-haskell/tree/develop) | [![Build Status](https://travis-ci.com/nwtgck/platy-lang-haskell.svg?token=TuxNpqznwwyy7hyJwBVm&branch=develop)](https://travis-ci.com/nwtgck/platy-lang-haskell) |
 
-## Installation of the compiler
+## Installation
+
+This installation allows you to use `platyc` compiler.
+
+### Mac
 
 ```bash
+brew install llvm-hs/homebrew-llvm/llvm-5.0
+cd <this repo>
 stack build
 stack install
 ```
 
-Then you can use `platyc` command.
+### Ubuntu 16.04
+
+```bash
+sudo apt-add-repository --yes "deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-5.0 main"
+sudo apt update
+sudo apt install -y llvm-5.0-dev
+cd <this repo>
+stack build
+stack install
+```
+
+If you use 14.04 (Trusty), you should replace the `apt-add-repository` with `sudo apt-add-repository --yes "deb http://apt.llvm.org/trusty/ llvm-toolchain-trusty-5.0 main"`.
+
+(useful link: https://apt.llvm.org/)
+
 
 ## Fibonacci function in Platy
 
