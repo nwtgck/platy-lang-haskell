@@ -17,6 +17,9 @@ stack install
 Then you can use `platyc` command.
 
 ## Fibonacci function in Platy
+
+![fib gif](demo_images/fib.gif)
+
 ```clojure
 (@func fib [(:: n Int)] Int
     (@if (or [(eq-int [n, 0]), (eq-int [n, 1])])
