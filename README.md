@@ -2,6 +2,13 @@
 
 Platy is a small programming language for practice of creating language. The compiler is a [LLVM](https://llvm.org/)-based compiler.
 
+It was designed to realize the following three ideas.
+
+1. **Declarative**
+1. **Statically typed**
+1. **Simple to implement**
+
+
 | branch | Travis status|
 | --- | --- |
 | [`master`](https://github.com/nwtgck/platy-lang-haskell/tree/master) | [![Build Status](https://travis-ci.com/nwtgck/platy-lang-haskell.svg?token=TuxNpqznwwyy7hyJwBVm&branch=master)](https://travis-ci.com/nwtgck/platy-lang-haskell) |
@@ -26,7 +33,7 @@ Then you can use `platyc` command.
 (@func fib [(:: n Int)] Int                                             ; func fib(n :: Int) -> Int =
     (@if (or [(eq-int [n, 0]), (eq-int [n, 1])])                        ;   if (n == 0 || n == 1)
         1                                                               ;     then 1
-        (add-int [(fib [(sub-int [n, 2])]), (fib [(sub-int [n, 1])])])  ;     else fib (n - 2) + fib (n + 1)
+        (add-int [(fib [(sub-int [n, 2])]), (fib [(sub-int [n, 1])])])  ;     else fib (n - 2) + fib (n - 1)
     )                                                                   ;
 )                                                                       ;
                                                                         ;
@@ -45,7 +52,7 @@ Then you can use `platyc` command.
 )
 ```
 
-You can fild whole code in [platy_programs/should_pass/fib.platy](platy_programs/should_pass/fib.platy)
+You can find actual code in [platy_programs/should_pass/fib.platy](platy_programs/should_pass/fib.platy).
 
 ## Features
 
@@ -76,3 +83,8 @@ You can fild whole code in [platy_programs/should_pass/fib.platy](platy_programs
 * Union type
 * Garbage collection
 * Type alias
+
+
+## Why S-expression-like syntax?
+
+Because it keeps easy to create parser. In addition, S-expression is very scalable and expandable.

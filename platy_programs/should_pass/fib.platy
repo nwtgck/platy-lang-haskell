@@ -3,7 +3,7 @@
 (@func fib [(:: n Int)] Int                                             ; func fib(n :: Int) -> Int =
     (@if (or [(eq-int [n, 0]), (eq-int [n, 1])])                        ;   if (n == 0 || n == 1)
         1                                                               ;     then 1
-        (add-int [(fib [(sub-int [n, 2])]), (fib [(sub-int [n, 1])])])  ;     else fib (n - 2) + fib (n + 1)
+        (add-int [(fib [(sub-int [n, 2])]), (fib [(sub-int [n, 1])])])  ;     else fib (n - 2) + fib (n - 1)
     )                                                                   ;
 )                                                                       ;
                                                                         ;
