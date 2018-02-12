@@ -74,6 +74,7 @@ tests:
      - process
      - here
      - parsec
+     - filepath
      - llvm-hs
      - llvm-hs-pure
      - llvm-hs-pretty

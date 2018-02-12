@@ -86,7 +86,7 @@ listP p = do
 identP :: Parsec String u Ident
 identP = do
   start <- ParsecChar.letter <|> ParsecChar.char '_'
-  rest  <- Parsec.many (ParsecChar.alphaNum <|> ParsecChar.char '_')
+  rest  <- Parsec.many (ParsecChar.alphaNum <|> ParsecChar.char '_' <|> ParsecChar.char '-')
   return $ Ident (start:rest)
 
 
