@@ -50,6 +50,10 @@ script:
 - stack build
 # Test
 - stack test
-# Working test of compiler
+# == Working test of compiler ==
+# [Compile]
 - stack exec platyc -- ./platy_programs/should_pass/fib.platy
 - ./fib
+# [Emit IR]
+- stack exec platyc -- --emit-llvm ./platy_programs/should_pass/fib.platy > fib.ll
+- lli-5.0 fib.ll
