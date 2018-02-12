@@ -135,12 +135,6 @@ exprP = litExprP <|> identExprP <|> betweenParens (applyExprP <|> (ParsecChar.ch
       -- let
       ParsecChar.string "let" -- TODO: Hard code
       Parsec.skipMany1 skipLangSpaceP
-      -- identifier
-      ident <- identP
-      Parsec.skipMany1 skipLangSpaceP
-      -- type
-      ty   <- tyP
-      Parsec.skipMany1 skipLangSpaceP
       -- binds
       binds <- listP (betweenParens (ParsecChar.string "::" *> Parsec.skipMany1 skipLangSpaceP *> bindP)) -- TODO: Hard code
       Parsec.skipMany1 skipLangSpaceP

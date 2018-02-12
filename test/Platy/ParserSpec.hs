@@ -79,7 +79,7 @@ spec = do
                              ]
                            , inExpr = IdentExpr $ Ident "a"
                            }
-      Parsec.parse exprP "" "(@let myVar Int [(:: a Int 2233) (:: b Char 'f')] a)" `shouldBe` expect
+      Parsec.parse exprP "" "(@let [(:: a Int 2233) (:: b Char 'f')] a)" `shouldBe` expect
 
 
   describe "Parse Global Definition" $ do
