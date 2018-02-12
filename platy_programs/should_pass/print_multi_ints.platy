@@ -1,3 +1,3 @@
 (@func main [] Unit
-    (@let [ (:: _dummy1_ Unit (print-int [445566])) (:: _dummy2_ Unit (print-int [123123]))] Unit)
+    (@let [ (= _dummy1_ Unit (print-int [445566])) (= _dummy2_ Unit (print-int [123123]))] Unit)
 )

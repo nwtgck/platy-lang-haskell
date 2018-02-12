@@ -24,7 +24,7 @@ ifStr = "if"
 localLetStr = "let"
 
 -- | Bind begging string in let-expression
-bindBeginInLetStr = "::"
+bindBeginInLetStr = "="
 
 -- | Param begging string
 paramBeginStr = "::"
