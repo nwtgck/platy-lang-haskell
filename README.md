@@ -1,18 +1,17 @@
 # Platy Programming Language
 
-Platy is a small programming language for practice of creating language. The compiler is a [LLVM](https://llvm.org/)-based compiler.
+| branch | Travis status|
+| --- | --- |
+| [`master`](https://github.com/nwtgck/platy-lang-haskell/tree/master) | [![Build Status](https://travis-ci.com/nwtgck/platy-lang-haskell.svg?token=TuxNpqznwwyy7hyJwBVm&branch=master)](https://travis-ci.com/nwtgck/platy-lang-haskell) |
+| [`develop`](https://github.com/nwtgck/platy-lang-haskell/tree/develop) | [![Build Status](https://travis-ci.com/nwtgck/platy-lang-haskell.svg?token=TuxNpqznwwyy7hyJwBVm&branch=develop)](https://travis-ci.com/nwtgck/platy-lang-haskell) |
 
+Platy is a small programming language for practice of creating language. The compiler is a [LLVM](https://llvm.org/)-based compiler.
 It was designed to realize the following three ideas.
 
 1. **Declarative**
 1. **Statically typed**
 1. **Simple to implement**
 
-
-| branch | Travis status|
-| --- | --- |
-| [`master`](https://github.com/nwtgck/platy-lang-haskell/tree/master) | [![Build Status](https://travis-ci.com/nwtgck/platy-lang-haskell.svg?token=TuxNpqznwwyy7hyJwBVm&branch=master)](https://travis-ci.com/nwtgck/platy-lang-haskell) |
-| [`develop`](https://github.com/nwtgck/platy-lang-haskell/tree/develop) | [![Build Status](https://travis-ci.com/nwtgck/platy-lang-haskell.svg?token=TuxNpqznwwyy7hyJwBVm&branch=develop)](https://travis-ci.com/nwtgck/platy-lang-haskell) |
 
 ## Installation
 
