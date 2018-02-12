@@ -51,9 +51,12 @@ script:
 # Test
 - stack test
 # == Working test of compiler ==
+# Install as command
+- stack install
 # [Compile]
-- stack exec platyc -- ./platy_programs/should_pass/fib.platy
+- platyc ./platy_programs/should_pass/fib.platy
 - ./fib
 # [Emit IR]
-- stack exec platyc -- --emit-llvm ./platy_programs/should_pass/fib.platy > fib.ll
+- platyc --emit-llvm ./platy_programs/should_pass/fib.platy > fib.ll
+- cat fib.ll
 - lli-5.0 fib.ll
