@@ -38,7 +38,7 @@ library:
    - llvm-hs-quote
 
 executables:
-  platy-lang-exe:
+  platyc:
     main:                Main.hs
     source-dirs:         app
     ghc-options:
@@ -51,6 +51,11 @@ executables:
      - bytestring
      - text
      - here
+     - optparse-applicative
+     - temporary
+     - process
+     - parsec
+     - filepath
      - llvm-hs
      - llvm-hs-pure
      - llvm-hs-pretty

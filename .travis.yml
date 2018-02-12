@@ -48,7 +48,15 @@ install:
 script:
 - stack setup
 - stack build
-# ==== THIS IS FOR JUST WORKING TEST ====
-- stack exec platy-lang-exe
 # Test
 - stack test
+# == Working test of compiler ==
+# Install as command
+- stack install
+# [Compile]
+- platyc ./platy_programs/should_pass/fib.platy
+- ./fib
+# [Emit IR]
+- platyc --emit-llvm ./platy_programs/should_pass/fib.platy > fib.ll
+- cat fib.ll
+- lli-5.0 fib.ll

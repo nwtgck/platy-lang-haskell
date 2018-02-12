@@ -1,6 +1,5 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE NamedFieldPuns #-}
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
 
 module Main where
@@ -8,90 +7,116 @@ module Main where
 
 import qualified Data.String.Here as Here
 import Control.Monad (mapM_)
-import qualified Data.ByteString.Char8 as BS
-import qualified Data.Text.Lazy.IO as TIO
-import qualified Data.Map as Map
-import Data.Map (Map)
-
-import qualified LLVM.Pretty
-
-import Debug.Trace
+import qualified Options.Applicative as OptApplicative
+import qualified System.IO.Temp as Temp
+import qualified System.Process as Process
+import qualified Data.ByteString as ByteString
+import qualified Text.Parsec      as Parsec
+import qualified System.FilePath.Posix as FilePath.Posix
+import qualified Control.Monad as Monad
+import qualified Data.Maybe as Maybe
+import Data.Version (showVersion)
 
 import Platy.Datatypes
 import Platy.Codegen
 import Platy.Utils
+import Platy.Parser
 
+import Paths_platy_lang (version)
+
+data PlatyOptions = PlatyOptions
+  { quiet         :: Bool
+  , emitLLVM      :: Bool
+  , outputPathMay :: Maybe FilePath
+  , platyFilePath :: FilePath
+  }
+
+-- (from: https://qiita.com/philopon/items/a29717af62831d3c8c07)
+platyOptionsP :: OptApplicative.Parser PlatyOptions
+platyOptionsP = PlatyOptions
+    <$>
+    (
+      OptApplicative.switch $ mconcat [
+        OptApplicative.long "quiet",
+        OptApplicative.help "quiet (no output)"
+      ]
+    )
+    <*>
+    (
+      OptApplicative.switch $ mconcat [
+        OptApplicative.long "emit-llvm",
+        OptApplicative.help "emit LLVM IR"
+      ]
+    )
+    <*>
+    (
+      OptApplicative.optional $ OptApplicative.strOption $ mconcat [
+        OptApplicative.short 'o',
+        OptApplicative.long "output",
+        OptApplicative.help "output file path"
+      ]
+    )
+    <*>
+    (OptApplicative.strArgument $ mconcat
+      [ OptApplicative.help ".platy file"
+      , OptApplicative.metavar "PLATY_FILE"
+      , OptApplicative.action "file"
+      ]
+    )
+
+platyOptionsPInfo :: OptApplicative.ParserInfo PlatyOptions
+platyOptionsPInfo = OptApplicative.info (OptApplicative.helper <*> versionP <*> platyOptionsP) OptApplicative.fullDesc
+  where
+    -- (from: https://haskell-lang.org/library/optparse-applicative)
+    versionP :: OptApplicative.Parser (a -> a)
+    versionP = OptApplicative.infoOption (showVersion version)
+                 (mconcat [
+                   OptApplicative.short 'v',
+                   OptApplicative.long "version",
+                   OptApplicative.help "Show version"
+                 ])
 
 main :: IO ()
 main = do
-  let expr1 = LitExpr (IntLit 1515)
-  let Right (operand1, exprCodeEnv1) = exprToOperandEither Map.empty [] expr1
-  print operand1
-  print exprCodeEnv1
+  -- Parse options
+  PlatyOptions{platyFilePath, emitLLVM, quiet, outputPathMay} <- OptApplicative.execParser platyOptionsPInfo
+  -- Get code string
+  platyCode <- readFile platyFilePath
+  -- Parse code
+  let programEither = Parsec.parse programP platyFilePath platyCode
+  case programEither of
+    Right program -> do
+     -- Generate LLVM module
+     let llvmModuleEither = programToModule program
+     case llvmModuleEither of
+       Right llvmModule -> do
+        if emitLLVM
+          then do
+            -- Print LLVM IR
+            toLLVM llvmModule
+          else do
+            -- Generate object byte string
+            objBString <- toObjByteString llvmModule
+            -- Create temp directory
+            Temp.withSystemTempDirectory "tempdir" $ \dirpath -> do
+              -- Create empty obj file
+              objfilePath <- Temp.emptyTempFile dirpath "objfile"
+              -- Save obj to a file
+              ByteString.writeFile objfilePath objBString
+              -- Create empty executable file
+              let execfilePath = Maybe.fromMaybe (FilePath.Posix.takeBaseName platyFilePath) outputPathMay
+               -- Make executable file
+              Process.system [Here.i|gcc ${objfilePath} -o ${execfilePath}|]
+              Monad.when (not quiet) $
+              -- Print generated message
+                putStrLn [Here.i|Executable '${execfilePath}' generated|]
+              return ()
 
-  let expr2 = IfExpr (LitExpr $ BoolLit True) (LitExpr $ IntLit 81818) (LitExpr $ IntLit 23232)
-  let Right (operand2, exprCodeEnv2) = exprToOperandEither Map.empty [] expr2
-  print operand2
-  print exprCodeEnv2
+       Left err -> putStrLn err
 
-  putStrLn("====================================")
-  let gdef1 = LetGdef {bind=Bind {ident=Ident "myint", ty=IntTy, bodyExpr=IfExpr (LitExpr $ BoolLit True) (LitExpr $ IntLit 81818) (LitExpr $ IntLit 23232)}}
-  let gdef2 = LetGdef {bind=Bind {ident=Ident "myint2", ty=IntTy, bodyExpr=IfExpr (LitExpr $ BoolLit True) (LitExpr $ IntLit 7117) (LitExpr $ IntLit 9889)}}
-  let Right mod1 = programToModule Program{gdefs=[gdef1, gdef2]}
---  TIO.putStrLn (LLVM.Pretty.ppllvm mod1)
-  putStrLn("----------------------------------")
-
-  toLLVM mod1
-
-  let gdef3 = LetGdef {bind=Bind {ident=Ident "myint", ty=IntTy, bodyExpr=LitExpr $ IntLit 2929}}
-  let mod2Either = programToModule Program{gdefs=[gdef3]}
-  let Right mod2 = mod2Either
---  print mod2
-  putStrLn("----------------------------------")
---  TIO.putStrLn (LLVM.Pretty.ppllvm mod2)
---  putStrLn("----------------------------------")
---  TIO.putStrLn (LLVM.Pretty.ppll mod2)
-  toLLVM mod2
-  putStrLn("----------------------------------")
-
-
-  let gdef4 :: Gdef
-      gdef4 = FuncGdef {ident=Ident "myfunc", params=[], retTy=IntTy, bodyExpr=LitExpr $ IntLit 32323}
-  let Right mod3 = programToModule Program{gdefs=[gdef4]}
-  toLLVM mod3
-  putStrLn("----------------------------------")
-
-
-  let gdef5 :: Gdef
-      gdef5 = FuncGdef {ident=Ident "myfunc", params=[], retTy=IntTy, bodyExpr=IfExpr (LitExpr $ BoolLit True) (LitExpr $ IntLit 5656) (LitExpr $ IntLit 767)}
-  let Right mod4 = programToModule Program{gdefs=[gdef5]}
-  toLLVM mod4
-  putStrLn("----------------------------------")
+    Left parseErr -> print parseErr
 
 
-  let gdef6 = LetGdef {bind=Bind {ident=Ident "myint", ty=IntTy, bodyExpr=LitExpr $ IntLit 8877}}
-  let gdef7 = LetGdef {bind=Bind {ident=Ident "myint2", ty=IntTy, bodyExpr=IdentExpr $ Ident "myint"}}
-  let Right mod5 = programToModule Program{gdefs=[gdef6, gdef7]}
-  toLLVM mod5
-  putStrLn("----------------------------------")
-
-  let gdef8 = LetGdef {bind=Bind {ident=Ident "value1", ty=IntTy, bodyExpr=LetExpr {binds = [Bind{ident=Ident "a", ty=IntTy, bodyExpr=LitExpr $ IntLit 8989}, Bind{ident=Ident "b", ty=IntTy, bodyExpr=LitExpr $ IntLit 3344}], inExpr=IdentExpr (Ident "a")}}}
-  let Right mod6 = programToModule Program{gdefs=[gdef8]}
-  toLLVM mod6
-  putStrLn("----------------------------------")
-
-
-  let gdef9 = LetGdef {bind=Bind {ident=Ident "value1", ty=IntTy, bodyExpr=LetExpr {binds = [Bind{ident=Ident "a", ty=IntTy, bodyExpr=LitExpr $ IntLit 8989}, Bind{ident=Ident "b", ty=IntTy, bodyExpr=IdentExpr (Ident "a")}], inExpr=IdentExpr (Ident "b")}}}
-  let Right mod7 = programToModule Program{gdefs=[gdef9]}
-  toLLVM mod7
-  putStrLn("----------------------------------")
-  TIO.putStrLn (LLVM.Pretty.ppll mod7)
-  putStrLn("----------------------------------")
-
-  let gdef11 = FuncGdef {ident=Ident "main", params=[], retTy=UnitTy, bodyExpr=ApplyExpr{calleeIdent=Ident "print-int", argExprs=[LitExpr $ IntLit 171717]}}
-  let Right mod8 = programToModule Program{gdefs=[gdef11]}
-  toLLVM mod8
-  putStrLn("----------------------------------")
 
 
 
