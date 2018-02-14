@@ -61,7 +61,7 @@ litToTy (UnitLit)   = UnitTy
 
 
 -- | Expr => LLVM Type
-exprToTy :: VarTable -> [VarTable] -> Expr -> Either ErrorType Ty
+exprToTy :: VarTable -> [VarTable] -> Expr -> Either CompileError Ty
 exprToTy gVarTable lVarTables (LitExpr lit)       = return $ litToTy lit
 exprToTy gVarTable lVarTables (IdentExpr (ident@(Ident name))) = do
   let identInfoMaybe = lookupLVarTables ident lVarTables <|> Map.lookup ident gVarTable
@@ -120,10 +120,8 @@ data CompileError =
  deriving (Eq, Show)
 
 
--- TODO: Change better type
-type ErrorType = CompileError
 
-newtype ExprCodegen a = ExprCodegen {runExprCodegen :: StateT ExprCodegenEnv (Either ErrorType) a}
+newtype ExprCodegen a = ExprCodegen {runExprCodegen :: StateT ExprCodegenEnv (Either CompileError) a}
   deriving (Functor, Applicative, Monad, MonadState ExprCodegenEnv)
 
 -- | Get fresh int count (zero-origin)
@@ -349,7 +347,7 @@ exprToExprCodegen (ifexpr@IfExpr {condExpr, thenExpr, elseExpr}) = do
 
 
 -- | Expr => Operand
-exprToOperandEither :: VarTable -> [VarTable] -> Expr -> Either ErrorType (AST.Operand, ExprCodegenEnv)
+exprToOperandEither :: VarTable -> [VarTable] -> Expr -> Either CompileError (AST.Operand, ExprCodegenEnv)
 exprToOperandEither globalVarTable localVarTables expr = runStateT (runExprCodegen $ exprToExprCodegen expr) initEnv
   where
     initEnv = ExprCodegenEnv {
@@ -368,7 +366,7 @@ data GdefCodegenEnv =
  }
  deriving (Show)
 
-newtype GdefCodegen a = GdefCodegen {runGdefCodegen :: StateT GdefCodegenEnv (Either ErrorType) a}
+newtype GdefCodegen a = GdefCodegen {runGdefCodegen :: StateT GdefCodegenEnv (Either CompileError) a}
   deriving (Functor, Applicative, Monad, MonadState GdefCodegenEnv)
 
 
@@ -513,7 +511,7 @@ gdefToGdefCodegen globalVarTable (FuncGdef {ident=ident@(Ident name), params, re
 
 
 -- | Program => AST.Module
-programToModule :: Program -> Either ErrorType AST.Module
+programToModule :: Program -> Either CompileError AST.Module
 programToModule Program{gdefs} = do
   let initEnv = GdefCodegenEnv {
                   definitions         = []
