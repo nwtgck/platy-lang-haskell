@@ -65,9 +65,9 @@ exprToTy :: VarTable -> [VarTable] -> Expr -> Either ErrorType Ty
 exprToTy gVarTable lVarTables (LitExpr lit)       = return $ litToTy lit
 exprToTy gVarTable lVarTables (IdentExpr (ident@(Ident name))) = do
   let identInfoMaybe = lookupLVarTables ident lVarTables <|> Map.lookup ident gVarTable
-      notFoundMsg  = [Here.i| Identifier '${name}' is not found|]
+      notFoundError = CompileError{errorCode=NoSuchIdentEC, errorMessage=[Here.i| Identifier '${name}' is not found|]}
   -- Get identifier information
-  identInfo <- Either.Utils.maybeToEither notFoundMsg identInfoMaybe
+  identInfo <- Either.Utils.maybeToEither notFoundError identInfoMaybe
   case identInfo of
      GVarIdentInfo{ty} -> return ty
      LVarIdentInfo{ty} -> return ty
@@ -75,9 +75,9 @@ exprToTy gVarTable lVarTables (IdentExpr (ident@(Ident name))) = do
 exprToTy gVarTable lVarTables (IfExpr {thenExpr}) = exprToTy gVarTable lVarTables thenExpr
 exprToTy gVarTable lVarTables (ApplyExpr{calleeIdent=calleeIdent@(Ident name)}) = do
   let identInfoMaybe = Map.lookup calleeIdent gVarTable
-      notFoundMsg    = [Here.i| Identifier '${name}' is not found|]
+      notFoundError = CompileError{errorCode=NoSuchIdentEC, errorMessage=[Here.i| Identifier '${name}' is not found|]}
   -- Get identifier information
-  identInfo <- Either.Utils.maybeToEither notFoundMsg identInfoMaybe
+  identInfo <- Either.Utils.maybeToEither notFoundError identInfoMaybe
   case identInfo of
     GVarIdentInfo{}      -> fail [Here.i| Identifier '${name}' should be function, but variable|]
     LVarIdentInfo{}      -> fail [Here.i| Unexpected error: '${name}' should be global function|]
@@ -104,8 +104,24 @@ data ExprCodegenEnv =
  }
  deriving (Show)
 
+
+-- | Error code
+data ErrorCode =
+  NoSuchIdentEC |
+  UnexpectedEC
+  deriving (Eq, Show)
+
+-- | Compile error
+data CompileError =
+ CompileError
+ { errorCode    :: ErrorCode
+ , errorMessage :: String
+ }
+ deriving (Eq, Show)
+
+
 -- TODO: Change better type
-type ErrorType = String
+type ErrorType = CompileError
 
 newtype ExprCodegen a = ExprCodegen {runExprCodegen :: StateT ExprCodegenEnv (Either ErrorType) a}
   deriving (Functor, Applicative, Monad, MonadState ExprCodegenEnv)
@@ -179,9 +195,9 @@ exprToExprCodegen (IdentExpr ident@(Ident name)) = do
   gVarTable  <- gets globalVarTable
   -- Find ident from tables
   let identInfoMaybe = lookupLVarTables ident lVarTables <|> Map.lookup ident gVarTable
-      notFoundMsg    = [Here.i| Identifier '${name}' is not found|]
+      notFoundError  = CompileError{errorCode=NoSuchIdentEC, errorMessage=[Here.i| Identifier '${name}' is not found|]}
   -- Get identifier information
-  indentInfo <- ExprCodegen $ Monad.Trans.lift $ Either.Utils.maybeToEither notFoundMsg identInfoMaybe
+  indentInfo <- ExprCodegen $ Monad.Trans.lift $ Either.Utils.maybeToEither notFoundError identInfoMaybe
   case indentInfo of
     GVarIdentInfo{ty, globalPtrName} -> do
       let llvmTy    = tyToLLVMTy ty
@@ -231,10 +247,10 @@ exprToExprCodegen (ApplyExpr {calleeIdent=calleeIdent@(Ident calleeName), argExp
   -- Result name
   let resName = AST.Name (strToShort [Here.i|$$apply_res${prefixNumber}|])
   -- Find ident from tables
-  let varInfoMaybe = Map.lookup calleeIdent gVarTable
-      notFoundMsg  = [Here.i| Callee identifier '${calleeName}' not found|]
+  let varInfoMaybe  = Map.lookup calleeIdent gVarTable
+      notFoundError = CompileError{errorCode=NoSuchIdentEC, errorMessage=[Here.i| Callee identifier '${calleeName}' not found|]}
   -- Get identifier information
-  identInfo <- ExprCodegen $ Monad.Trans.lift $ Either.Utils.maybeToEither notFoundMsg varInfoMaybe
+  identInfo <- ExprCodegen $ Monad.Trans.lift $ Either.Utils.maybeToEither notFoundError varInfoMaybe
   case identInfo of
     FuncIdentInfo{retTy, paramTys, funcName} -> do
       -- Get type
