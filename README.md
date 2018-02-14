@@ -37,7 +37,7 @@ stack build
 stack install
 ```
 
-If you use 14.04 (Trusty), you should replace the `apt-add-repository` with `sudo apt-add-repository --yes "deb http://apt.llvm.org/trusty/ llvm-toolchain-trusty-5.0 main"`.
+If you use 14.04 (Trusty), you should replace the `sudo apt-add-repository ...` with `sudo apt-add-repository --yes "deb http://apt.llvm.org/trusty/ llvm-toolchain-trusty-5.0 main"`.
 
 (useful link: https://apt.llvm.org/)
 
@@ -93,15 +93,23 @@ You can find actual code in [platy_programs/should_pass/fib.platy](platy_program
 
 ### What Platy doesn't have
 * Lambda expression
-* Struct
+* Currying
+* Partial application
+* Structure
+* Generic structure, template class
+* Generic function
+* Pattern Matching
 * `String` type
 * Assignment
-* Object-oriented (no method, no polymorphism)
+* Object-oriented (no class, no method, no polymorphism)
 * Type class, interface, trait
 * Package, module
 * Union type
 * Garbage collection
 * Type alias
+* Type family
+* Macro
+* Foreign Function Interface
 
 
 ## Why S-expression-like syntax?
