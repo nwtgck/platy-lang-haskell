@@ -61,11 +61,11 @@ litToTy (UnitLit)   = UnitTy
 
 
 -- | Expr => LLVM Type
-exprToTy :: VarTable -> [VarTable] -> Expr -> Either CompileError Ty
+exprToTy :: VarTable -> [VarTable] -> Expr -> Either SemanticError Ty
 exprToTy gVarTable lVarTables (LitExpr lit)       = return $ litToTy lit
 exprToTy gVarTable lVarTables (IdentExpr (ident@(Ident name))) = do
   let identInfoMaybe = lookupLVarTables ident lVarTables <|> Map.lookup ident gVarTable
-      notFoundError = CompileError{errorCode=NoSuchIdentEC, errorMessage=[Here.i| Identifier '${name}' is not found|]}
+      notFoundError = SemanticError{errorCode=NoSuchIdentEC, errorMessage=[Here.i| Identifier '${name}' is not found|]}
   -- Get identifier information
   identInfo <- Either.Utils.maybeToEither notFoundError identInfoMaybe
   case identInfo of
@@ -75,7 +75,7 @@ exprToTy gVarTable lVarTables (IdentExpr (ident@(Ident name))) = do
 exprToTy gVarTable lVarTables (IfExpr {thenExpr}) = exprToTy gVarTable lVarTables thenExpr
 exprToTy gVarTable lVarTables (ApplyExpr{calleeIdent=calleeIdent@(Ident name)}) = do
   let identInfoMaybe = Map.lookup calleeIdent gVarTable
-      notFoundError = CompileError{errorCode=NoSuchIdentEC, errorMessage=[Here.i| Identifier '${name}' is not found|]}
+      notFoundError = SemanticError{errorCode=NoSuchIdentEC, errorMessage=[Here.i| Identifier '${name}' is not found|]}
   -- Get identifier information
   identInfo <- Either.Utils.maybeToEither notFoundError identInfoMaybe
   case identInfo of
@@ -111,9 +111,9 @@ data ErrorCode =
   UnexpectedEC
   deriving (Eq, Show)
 
--- | Compile error
-data CompileError =
- CompileError
+-- | Semantic error
+data SemanticError =
+ SemanticError
  { errorCode    :: ErrorCode
  , errorMessage :: String
  }
@@ -121,7 +121,7 @@ data CompileError =
 
 
 
-newtype ExprCodegen a = ExprCodegen {runExprCodegen :: StateT ExprCodegenEnv (Either CompileError) a}
+newtype ExprCodegen a = ExprCodegen {runExprCodegen :: StateT ExprCodegenEnv (Either SemanticError) a}
   deriving (Functor, Applicative, Monad, MonadState ExprCodegenEnv)
 
 -- | Get fresh int count (zero-origin)
@@ -193,7 +193,7 @@ exprToExprCodegen (IdentExpr ident@(Ident name)) = do
   gVarTable  <- gets globalVarTable
   -- Find ident from tables
   let identInfoMaybe = lookupLVarTables ident lVarTables <|> Map.lookup ident gVarTable
-      notFoundError  = CompileError{errorCode=NoSuchIdentEC, errorMessage=[Here.i| Identifier '${name}' is not found|]}
+      notFoundError  = SemanticError{errorCode=NoSuchIdentEC, errorMessage=[Here.i| Identifier '${name}' is not found|]}
   -- Get identifier information
   indentInfo <- ExprCodegen $ Monad.Trans.lift $ Either.Utils.maybeToEither notFoundError identInfoMaybe
   case indentInfo of
@@ -246,7 +246,7 @@ exprToExprCodegen (ApplyExpr {calleeIdent=calleeIdent@(Ident calleeName), argExp
   let resName = AST.Name (strToShort [Here.i|$$apply_res${prefixNumber}|])
   -- Find ident from tables
   let varInfoMaybe  = Map.lookup calleeIdent gVarTable
-      notFoundError = CompileError{errorCode=NoSuchIdentEC, errorMessage=[Here.i| Callee identifier '${calleeName}' not found|]}
+      notFoundError = SemanticError{errorCode=NoSuchIdentEC, errorMessage=[Here.i| Callee identifier '${calleeName}' not found|]}
   -- Get identifier information
   identInfo <- ExprCodegen $ Monad.Trans.lift $ Either.Utils.maybeToEither notFoundError varInfoMaybe
   case identInfo of
@@ -347,7 +347,7 @@ exprToExprCodegen (ifexpr@IfExpr {condExpr, thenExpr, elseExpr}) = do
 
 
 -- | Expr => Operand
-exprToOperandEither :: VarTable -> [VarTable] -> Expr -> Either CompileError (AST.Operand, ExprCodegenEnv)
+exprToOperandEither :: VarTable -> [VarTable] -> Expr -> Either SemanticError (AST.Operand, ExprCodegenEnv)
 exprToOperandEither globalVarTable localVarTables expr = runStateT (runExprCodegen $ exprToExprCodegen expr) initEnv
   where
     initEnv = ExprCodegenEnv {
@@ -366,7 +366,7 @@ data GdefCodegenEnv =
  }
  deriving (Show)
 
-newtype GdefCodegen a = GdefCodegen {runGdefCodegen :: StateT GdefCodegenEnv (Either CompileError) a}
+newtype GdefCodegen a = GdefCodegen {runGdefCodegen :: StateT GdefCodegenEnv (Either SemanticError) a}
   deriving (Functor, Applicative, Monad, MonadState GdefCodegenEnv)
 
 
@@ -511,7 +511,7 @@ gdefToGdefCodegen globalVarTable (FuncGdef {ident=ident@(Ident name), params, re
 
 
 -- | Program => AST.Module
-programToModule :: Program -> Either CompileError AST.Module
+programToModule :: Program -> Either SemanticError AST.Module
 programToModule Program{gdefs} = do
   let initEnv = GdefCodegenEnv {
                   definitions         = []
