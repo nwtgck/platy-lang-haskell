@@ -1,0 +1,5 @@
+(@global-let a Char 2323)
+
+(@func main [] Unit
+    Unit
+)
