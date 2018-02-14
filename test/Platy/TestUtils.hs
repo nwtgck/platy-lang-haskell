@@ -44,7 +44,7 @@ execModule llvmMod = do
 
 
 -- | Convert Program => Module => Execute it => Stdout
-execProgram :: Program -> IO String
+execProgram :: Program () -> IO String
 execProgram program = do
   -- Generate LLVM module
   let llvmModEither = programToModule program

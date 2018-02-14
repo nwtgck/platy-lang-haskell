@@ -61,9 +61,9 @@ litToTy (UnitLit)   = UnitTy
 
 
 -- | Expr => LLVM Type
-exprToTy :: VarTable -> [VarTable] -> Expr -> Either SemanticError Ty
-exprToTy gVarTable lVarTables (LitExpr lit)       = return $ litToTy lit
-exprToTy gVarTable lVarTables (IdentExpr (ident@(Ident name))) = do
+exprToTy :: VarTable -> [VarTable] -> (Expr ()) -> Either SemanticError Ty
+exprToTy gVarTable lVarTables (LitExpr {lit})       = return $ litToTy lit
+exprToTy gVarTable lVarTables (IdentExpr {ident=ident@(Ident name)}) = do
   let identInfoMaybe = lookupLVarTables ident lVarTables <|> Map.lookup ident gVarTable
       notFoundError = SemanticError{errorCode=NoSuchIdentEC, errorMessage=[Here.i| Identifier '${name}' is not found|]}
   -- Get identifier information
@@ -185,9 +185,9 @@ withLVarTable lVarMap f = do
   return ret
 
 -- | Expr => Operand
-exprToExprCodegen :: Expr -> ExprCodegen AST.Operand
-exprToExprCodegen (LitExpr lit) = return (litToOperand lit)
-exprToExprCodegen (IdentExpr ident@(Ident name)) = do
+exprToExprCodegen :: (Expr ()) -> ExprCodegen AST.Operand
+exprToExprCodegen (LitExpr {lit}) = return (litToOperand lit)
+exprToExprCodegen (IdentExpr {ident=ident@(Ident name)}) = do
   -- Get local variable tables
   lVarTables <- gets localVarTables
   -- Get global variable table
@@ -219,7 +219,7 @@ exprToExprCodegen (LetExpr {binds, inExpr}) = do
   prefixNumber <- getFreshCount
 
   -- TODO: Rename better
-  let f :: Map Ident IdentInfo -> Bind -> ExprCodegen (Map Ident IdentInfo)
+  let f :: Map Ident IdentInfo -> Bind () -> ExprCodegen (Map Ident IdentInfo)
       f lVarMap (Bind {ident=ident@(Ident name), ty, bodyExpr}) = do
         withLVarTable lVarMap $ do -- NOTE: push & pop (lVarMap)
           -- Eval bodyExpr to operand
@@ -348,7 +348,7 @@ exprToExprCodegen (ifexpr@IfExpr {condExpr, thenExpr, elseExpr}) = do
 
 
 -- | Expr => Operand
-exprToOperandEither :: VarTable -> [VarTable] -> Expr -> Either SemanticError (AST.Operand, ExprCodegenEnv)
+exprToOperandEither :: VarTable -> [VarTable] -> Expr () -> Either SemanticError (AST.Operand, ExprCodegenEnv)
 exprToOperandEither globalVarTable localVarTables expr = runStateT (runExprCodegen $ exprToExprCodegen expr) initEnv
   where
     initEnv = ExprCodegenEnv {
@@ -396,7 +396,7 @@ genParamName :: Ident -> AST.Name
 genParamName (Ident name) = AST.Name (strToShort [Here.i|$$param/${name}|])
 
 -- Gdef => GdefCodegen
-gdefToGdefCodegen :: VarTable -> Gdef -> GdefCodegen ()
+gdefToGdefCodegen :: VarTable -> Gdef () -> GdefCodegen ()
 gdefToGdefCodegen globalVarTable (LetGdef (Bind {ident=ident@(Ident name), ty, bodyExpr})) = do
   let globalName   = genGlobalVarName ident
       initFuncName = AST.Name (strToShort [Here.i|$$PLATY_INIT/${name}|])
@@ -518,7 +518,7 @@ gdefToGdefCodegen globalVarTable (FuncGdef {ident=ident@(Ident name), params, re
 
 
 -- | Program => AST.Module
-programToModule :: Program -> Either SemanticError AST.Module
+programToModule :: Program () -> Either SemanticError AST.Module
 programToModule Program{gdefs} = do
   let initEnv = GdefCodegenEnv {
                   definitions         = []
