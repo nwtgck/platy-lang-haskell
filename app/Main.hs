@@ -112,9 +112,13 @@ main = do
                 putStrLn [Here.i|Executable '${execfilePath}' generated|]
               return ()
 
-       Left err -> putStrLn err
+       Left err -> print err
+       -- TODO: Print to stdrr
+       -- TODO: Exit with error
 
     Left parseErr -> print parseErr
+    -- TODO: Print to stdrr
+    -- TODO: Exit with error
 
 
 

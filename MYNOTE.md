@@ -17,5 +17,4 @@ Here is abbreviations used in this project.
 * `oooP` - ooo parser (e.g. `exprP`)
 * `cond` - condition (e.g. `condExpr`)
 * `mod` - module (e.g. `llvmMod`)
-
-(At Tue Feb 13 01:02:13 2018 +0900, 5d3fa4406e4ef95cb1ab6cd1dac991d431a63090)
+* `OooEC` - Error Code (e.g. `NoSuchIdentEC`)
