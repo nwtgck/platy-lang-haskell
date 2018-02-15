@@ -85,7 +85,7 @@ spec = do
         -- Is right or not
         typedProgramEither `shouldSatisfy` Either.isLeft
         -- Extract error
-        let Left SemanticError2{errorCode} = typedProgramEither
+        let Left SemanticError{errorCode} = typedProgramEither
         -- String expression of error code
         let errorCodeStr = show errorCode
         -- Compare with expectation

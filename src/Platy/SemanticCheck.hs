@@ -25,7 +25,7 @@ import qualified Platy.Utils as Utils
 
 -- | Error code
 -- TODO: Rename
-data ErrorCode2 =
+data ErrorCode =
     NoSuchIdentEC
   | TypeMismatchEC
   | ArgsNumMismatchEC
@@ -34,9 +34,9 @@ data ErrorCode2 =
 
 -- | Semantic error
 -- TODO: Rename
-data SemanticError2 =
- SemanticError2
- { errorCode    :: ErrorCode2
+data SemanticError =
+ SemanticError
+ { errorCode    :: ErrorCode
  , errorMessage :: String
  }
  deriving (Eq, Show)
@@ -56,7 +56,7 @@ data SemanticCheckEnv =
  }
   deriving (Show)
 
-newtype SemanticCheck a = SemanticCheck {runSemanticCheck :: StateT SemanticCheckEnv (Either SemanticError2) a}
+newtype SemanticCheck a = SemanticCheck {runSemanticCheck :: StateT SemanticCheckEnv (Either SemanticError) a}
   deriving (Functor, Applicative, Monad, MonadState SemanticCheckEnv)
 
 -- | Literal => Ty
@@ -68,11 +68,11 @@ litToTy (UnitLit)   = UnitTy
 
 -- | Expr => LLVM Type
 -- TODO: Remove
-exprToTy :: VarTable -> [VarTable] -> (Expr ()) -> Either SemanticError2 Ty
+exprToTy :: VarTable -> [VarTable] -> (Expr ()) -> Either SemanticError Ty
 exprToTy gVarTable lVarTables (LitExpr {lit})       = return $ litToTy lit
 exprToTy gVarTable lVarTables (IdentExpr {ident=ident@(Ident name)}) = do
   let identInfoMaybe = Utils.lookupMaps ident lVarTables <|> Map.lookup ident gVarTable
-      notFoundError = SemanticError2{errorCode=NoSuchIdentEC, errorMessage=[Here.i| Identifier '${name}' is not found|]}
+      notFoundError = SemanticError{errorCode=NoSuchIdentEC, errorMessage=[Here.i| Identifier '${name}' is not found|]}
   -- Get identifier information
   identInfo <- Either.Utils.maybeToEither notFoundError identInfoMaybe
   case identInfo of
@@ -82,7 +82,7 @@ exprToTy gVarTable lVarTables (IdentExpr {ident=ident@(Ident name)}) = do
 exprToTy gVarTable lVarTables (IfExpr {thenExpr}) = exprToTy gVarTable lVarTables thenExpr
 exprToTy gVarTable lVarTables (ApplyExpr{calleeIdent=calleeIdent@(Ident name)}) = do
   let identInfoMaybe = Map.lookup calleeIdent gVarTable
-      notFoundError = SemanticError2{errorCode=NoSuchIdentEC, errorMessage=[Here.i| Identifier '${name}' is not found|]}
+      notFoundError = SemanticError{errorCode=NoSuchIdentEC, errorMessage=[Here.i| Identifier '${name}' is not found|]}
   -- Get identifier information
   identInfo <- Either.Utils.maybeToEither notFoundError identInfoMaybe
   case identInfo of
@@ -113,7 +113,7 @@ exprToTypedExpr IdentExpr{ident=ident@(Ident name)} = do
   gVarTable  <- gets globalVarTable
   -- Get identifier information
   identInfo <- let identInfoMaybe = Utils.lookupMaps ident lVarTables <|> Map.lookup ident gVarTable
-                   notFoundError  = SemanticError2{errorCode=NoSuchIdentEC, errorMessage=[Here.i| Identifier '${name}' is not found|]}
+                   notFoundError  = SemanticError{errorCode=NoSuchIdentEC, errorMessage=[Here.i| Identifier '${name}' is not found|]}
                in SemanticCheck $ Monad.Trans.lift $ Either.Utils.maybeToEither notFoundError identInfoMaybe
   case identInfo of
      GVarIdentInfo{ty} -> return IdentExpr {anno=ty, ident}
@@ -140,9 +140,9 @@ exprToTypedExpr IfExpr {condExpr, thenExpr, elseExpr} = do
         then do
           return IfExpr {anno=thenTy, condExpr=typedCondExpr, thenExpr=typedThenExpr, elseExpr=typedElseExpr}
         else
-          SemanticCheck $ Monad.Trans.lift $ Left SemanticError2{errorCode=TypeMismatchEC, errorMessage=[Here.i| Types of then and else should be the same, but then: ${thenTy}, else: ${elseTy} found|]}
+          SemanticCheck $ Monad.Trans.lift $ Left SemanticError{errorCode=TypeMismatchEC, errorMessage=[Here.i| Types of then and else should be the same, but then: ${thenTy}, else: ${elseTy} found|]}
     else
-      SemanticCheck $ Monad.Trans.lift $ Left SemanticError2{errorCode=TypeMismatchEC, errorMessage=[Here.i| Condtion should be Bool type, but '${condTy}' found|]}
+      SemanticCheck $ Monad.Trans.lift $ Left SemanticError{errorCode=TypeMismatchEC, errorMessage=[Here.i| Condtion should be Bool type, but '${condTy}' found|]}
 exprToTypedExpr ApplyExpr{calleeIdent=calleeIdent@(Ident name), argExprs} = do
   -- Type argExpr
   typedArgExprs <- mapM exprToTypedExpr argExprs
@@ -150,7 +150,7 @@ exprToTypedExpr ApplyExpr{calleeIdent=calleeIdent@(Ident name), argExprs} = do
   gVarTable <- gets globalVarTable
   -- Get identifier information
   identInfo <- let identInfoMaybe = Map.lookup calleeIdent gVarTable
-                   notFoundError  = SemanticError2{errorCode=NoSuchIdentEC, errorMessage=[Here.i| Identifier '${name}' is not found|]}
+                   notFoundError  = SemanticError{errorCode=NoSuchIdentEC, errorMessage=[Here.i| Identifier '${name}' is not found|]}
                in SemanticCheck $ Monad.Trans.lift $ Either.Utils.maybeToEither notFoundError identInfoMaybe
   case identInfo of
     GVarIdentInfo{}      -> fail [Here.i| Identifier '${name}' should be function, but variable|]
@@ -162,9 +162,9 @@ exprToTypedExpr ApplyExpr{calleeIdent=calleeIdent@(Ident name), argExprs} = do
           if paramTys == actualArgTys
           then return ApplyExpr{anno=retTy, calleeIdent, argExprs=typedArgExprs}
           else
-            SemanticCheck $ Monad.Trans.lift $ Left SemanticError2{errorCode=TypeMismatchEC, errorMessage=[Here.i| The argument should be '${paramTys}', but '${actualArgTys}'|]}
+            SemanticCheck $ Monad.Trans.lift $ Left SemanticError{errorCode=TypeMismatchEC, errorMessage=[Here.i| The argument should be '${paramTys}', but '${actualArgTys}'|]}
         else
-          SemanticCheck $ Monad.Trans.lift $ Left SemanticError2{errorCode=ArgsNumMismatchEC, errorMessage=[Here.i| The number of arguments should be ${length paramTys}, but ${length typedArgExprs}|]}
+          SemanticCheck $ Monad.Trans.lift $ Left SemanticError{errorCode=ArgsNumMismatchEC, errorMessage=[Here.i| The number of arguments should be ${length paramTys}, but ${length typedArgExprs}|]}
 exprToTypedExpr LetExpr{binds, inExpr} = do
   -- TODO: Rename better
   let f :: (Map Ident IdentInfo, [Bind Ty]) -> Bind () -> SemanticCheck (Map Ident IdentInfo, [Bind Ty])
@@ -180,7 +180,7 @@ exprToTypedExpr LetExpr{binds, inExpr} = do
               let typedBind  = Bind {ident, ty, bodyExpr=typedBodyExpr}
               return (newlVarMap, typedBinds ++ [typedBind])
             else
-              SemanticCheck $ Monad.Trans.lift $ Left SemanticError2{errorCode=TypeMismatchEC, errorMessage=[Here.i| Type of the expresson should be '${ty}' but found '${actualBodyTy}'|]}
+              SemanticCheck $ Monad.Trans.lift $ Left SemanticError{errorCode=TypeMismatchEC, errorMessage=[Here.i| Type of the expresson should be '${ty}' but found '${actualBodyTy}'|]}
 
   -- Define all binds
   (localVariableMap, typedBinds) <- Foldable.foldlM f (Map.empty :: Map Ident IdentInfo, [] :: [Bind Ty]) binds
@@ -191,7 +191,7 @@ exprToTypedExpr LetExpr{binds, inExpr} = do
   return LetExpr{anno=anno typedInExpr, binds=typedBinds, inExpr=typedInExpr}
 
 -- | Gdef () => Gdef Ty
-gdefToTypedGdef :: VarTable -> Gdef () -> Either SemanticError2 (Gdef Ty)
+gdefToTypedGdef :: VarTable -> Gdef () -> Either SemanticError (Gdef Ty)
 gdefToTypedGdef globalVarTable gdef =
   case gdef of
     LetGdef{bind=Bind{ident, ty, bodyExpr}} -> do
@@ -203,7 +203,7 @@ gdefToTypedGdef globalVarTable gdef =
         then
           return LetGdef{bind=Bind{ident, ty, bodyExpr=typedBodyExpr}}
         else
-          Left SemanticError2{errorCode=TypeMismatchEC, errorMessage=[Here.i| Type of the expresson should be '${ty}' but found '${actualBodyTy}'|]}
+          Left SemanticError{errorCode=TypeMismatchEC, errorMessage=[Here.i| Type of the expresson should be '${ty}' but found '${actualBodyTy}'|]}
     FuncGdef {ident, params, retTy, bodyExpr} -> do
       -- Variable of parameters
       let paramVarTable = Map.fromList [(ident, LVarIdentInfo{ty=ty}) | Param{ident, ty} <- params]
@@ -215,10 +215,10 @@ gdefToTypedGdef globalVarTable gdef =
        then
          return FuncGdef {ident, params, retTy, bodyExpr=typedBodyExpr}
        else
-         Left SemanticError2{errorCode=TypeMismatchEC, errorMessage=[Here.i| Return-type of the function body should be '${retTy}' but found '${actualBodyTy}'|]}
+         Left SemanticError{errorCode=TypeMismatchEC, errorMessage=[Here.i| Return-type of the function body should be '${retTy}' but found '${actualBodyTy}'|]}
 
 -- | Program () => Program Ty
-programToTypedProgram :: Program () -> Either SemanticError2 (Program Ty)
+programToTypedProgram :: Program () -> Either SemanticError (Program Ty)
 programToTypedProgram Program{gdefs} = do
   let f LetGdef {bind=Bind {ident, ty}} = (ident, GVarIdentInfo {ty=ty})
       f FuncGdef {ident, retTy, params} = (ident, FuncIdentInfo {retTy=retTy, paramTys=[ty | Param {ty} <- params]})
