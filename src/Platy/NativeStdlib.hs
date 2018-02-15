@@ -27,36 +27,52 @@ data NativeGdef =
   }
 
 
+printIntLLVMName  :: AST.Name
+printIntLLVMName = AST.Name "print-int"
+
+eqIntLLVMName :: AST.Name
+eqIntLLVMName    = AST.Name "eq-int"
+
+addIntLLVMName :: AST.Name
+addIntLLVMName   = AST.Name "add-int"
+
+subIntLLVMName :: AST.Name
+subIntLLVMName   = AST.Name "sub-int"
+
+orLLVMName :: AST.Name
+orLLVMName       = AST.Name "or"
+
+
 -- Native global definition table in standard library
 stdlibNativeGdefMap = Map.fromList [ ( Ident "print-int"
                             , FuncNativeGdef
                               { retTy = UnitTy
                               , paramTys = [IntTy]
-                              , funcLLVMName = AST.Name "print-int"
+                              , funcLLVMName = printIntLLVMName
                               })
                           , ( Ident "eq-int"
                             , FuncNativeGdef
                               { retTy = BoolTy
                               , paramTys = [IntTy, IntTy]
-                              , funcLLVMName = AST.Name "eq-int"
+                              , funcLLVMName = eqIntLLVMName
                               })
                           , ( Ident "add-int"
                             , FuncNativeGdef
                               { retTy = IntTy
                               , paramTys = [IntTy, IntTy]
-                              , funcLLVMName = AST.Name "add-int"
+                              , funcLLVMName = addIntLLVMName
                               })
                           , ( Ident "sub-int"
                             , FuncNativeGdef
                               { retTy = IntTy
                               , paramTys = [IntTy, IntTy]
-                              , funcLLVMName = AST.Name "sub-int"
+                              , funcLLVMName = subIntLLVMName
                               })
                           , ( Ident "or"
                             , FuncNativeGdef
                               { retTy = BoolTy
                               , paramTys = [BoolTy, BoolTy]
-                              , funcLLVMName = AST.Name "or"
+                              , funcLLVMName = orLLVMName
                               })
                           ]
 
@@ -85,7 +101,7 @@ stdlibLLVMDefs = [intFormatDef, printfDef, printIntDef, eqIntDef, addIntDef, sub
 
     -- NOTE: `i1` is Unit Type
     printIntDef = [Quote.LLVM.lldef|
-      define $type:llvmUnitTy @print-int($type:printIntParamTy $id:printIntParamName){
+      define $type:llvmUnitTy $gid:printIntLLVMName($type:printIntParamTy $id:printIntParamName){
       entry:
           $id:chPtrName = $instr:gepInstr
           $instr:callPrintfInstr
@@ -129,7 +145,7 @@ stdlibLLVMDefs = [intFormatDef, printfDef, printIntDef, eqIntDef, addIntDef, sub
 
     -- eq-int
     eqIntDef = [Quote.LLVM.lldef|
-      define $type:llvmBoolTy @eq-int($type:llvmIntTy %a, $type:llvmIntTy %b){
+      define $type:llvmBoolTy $gid:eqIntLLVMName($type:llvmIntTy %a, $type:llvmIntTy %b){
         %res = icmp eq $type:llvmIntTy %a, %b
         ret $type:llvmBoolTy %res
       }
@@ -137,7 +153,7 @@ stdlibLLVMDefs = [intFormatDef, printfDef, printIntDef, eqIntDef, addIntDef, sub
 
     -- add-int
     addIntDef = [Quote.LLVM.lldef|
-      define $type:llvmIntTy @add-int($type:llvmIntTy %a, $type:llvmIntTy %b){
+      define $type:llvmIntTy $gid:addIntLLVMName($type:llvmIntTy %a, $type:llvmIntTy %b){
         %res = add $type:llvmIntTy %a, %b
         ret $type:llvmIntTy %res
       }
@@ -145,7 +161,7 @@ stdlibLLVMDefs = [intFormatDef, printfDef, printIntDef, eqIntDef, addIntDef, sub
 
     -- sub-int
     subIntDef = [Quote.LLVM.lldef|
-      define $type:llvmIntTy @sub-int($type:llvmIntTy %a, $type:llvmIntTy %b){
+      define $type:llvmIntTy $gid:subIntLLVMName($type:llvmIntTy %a, $type:llvmIntTy %b){
         %res = sub $type:llvmIntTy %a, %b
         ret $type:llvmIntTy %res
       }
@@ -153,7 +169,7 @@ stdlibLLVMDefs = [intFormatDef, printfDef, printIntDef, eqIntDef, addIntDef, sub
 
     -- or
     orDef = [Quote.LLVM.lldef|
-      define $type:llvmBoolTy @or($type:llvmBoolTy %a, $type:llvmBoolTy %b){
+      define $type:llvmBoolTy $gid:orLLVMName($type:llvmBoolTy %a, $type:llvmBoolTy %b){
         %res = or $type:llvmBoolTy %a, %b
         ret $type:llvmBoolTy %res
       }
