@@ -190,8 +190,40 @@ exprToTypedExpr LetExpr{binds, inExpr} = do
     exprToTypedExpr inExpr
   return LetExpr{anno=anno typedInExpr, binds=typedBinds, inExpr=typedInExpr}
 
-gdefToTypedGdef :: Gdef () -> Gdef Ty
-gdefToTypedGdef = undefined
+-- | Gdef () => Gdef Ty
+gdefToTypedGdef :: VarTable -> Gdef () -> Either SemanticError2 (Gdef Ty)
+gdefToTypedGdef globalVarTable gdef =
+  case gdef of
+    LetGdef{bind=Bind{ident, ty, bodyExpr}} -> do
+      let initEnv = SemanticCheckEnv {globalVarTable, localVarTables=[]}
+      typedBodyExpr <- evalStateT (runSemanticCheck $ exprToTypedExpr bodyExpr) initEnv
+      let actualBodyTy :: Ty
+          actualBodyTy  = anno typedBodyExpr
+      if ty == actualBodyTy
+        then
+          return LetGdef{bind=Bind{ident, ty, bodyExpr=typedBodyExpr}}
+        else
+          Left SemanticError2{errorCode=TypeMismatchEC, errorMessage=[Here.i| Type of the expresson should be '${ty}' but found '${actualBodyTy}'|]}
+    FuncGdef {ident, params, retTy, bodyExpr} -> do
+      -- Variable of parameters
+      let paramVarTable = Map.fromList [(ident, LVarIdentInfo{ty=ty}) | Param{ident, ty} <- params]
+      let initEnv = SemanticCheckEnv {globalVarTable, localVarTables=[paramVarTable]}
+      typedBodyExpr <- evalStateT (runSemanticCheck $ exprToTypedExpr bodyExpr) initEnv
+      let actualBodyTy :: Ty
+          actualBodyTy  = anno typedBodyExpr
+      if retTy == actualBodyTy
+       then
+         return FuncGdef {ident, params, retTy, bodyExpr=typedBodyExpr}
+       else
+         Left SemanticError2{errorCode=TypeMismatchEC, errorMessage=[Here.i| Return-type of the function body should be '${retTy}' but found '${actualBodyTy}'|]}
 
-programToTypedProgram :: Program () -> Program Ty
-programToTypedProgram = undefined -- TODO: impl
+-- | Program () => Program Ty
+programToTypedProgram :: Program () -> Either SemanticError2 (Program Ty)
+programToTypedProgram Program{gdefs} = do
+  let f LetGdef {bind=Bind {ident, ty}} = (ident, GVarIdentInfo {ty=ty})
+      f FuncGdef {ident, retTy, params} = (ident, FuncIdentInfo {retTy=retTy, paramTys=[ty | Param {ty} <- params]})
+      -- TODO: <Find duplicated indentifier>
+      globalVarMap = Map.fromList (fmap f gdefs)
+  --Type gdefs
+  typedGdefs <- mapM (gdefToTypedGdef globalVarMap) gdefs
+  return Program{gdefs=typedGdefs}

@@ -182,3 +182,72 @@ spec = do
                            , inExpr = IdentExpr{anno=IntTy, ident=Ident "a"}
                            }
       actual `shouldBe` expect
+
+  describe "[positive] programToTypedProgram" $ do
+    it "global-let" $ do
+      let prog1   = Program
+                    { gdefs =
+                      [ LetGdef
+                        { bind =
+                          Bind
+                          { ident = Ident "a"
+                          , ty = IntTy
+                          , bodyExpr = LitExpr {anno=(), lit=IntLit 337733}
+                          }
+                        }
+                      , LetGdef
+                        { bind =
+                          Bind
+                          { ident = Ident "b"
+                          , ty = IntTy
+                          , bodyExpr = LitExpr {anno=(), lit=IntLit 909}
+                          }
+                        }
+                      ]
+                    }
+      let actual  = programToTypedProgram prog1
+      let expect  = Right Program
+                          { gdefs =
+                            [ LetGdef
+                              { bind =
+                                Bind
+                                { ident = Ident "a"
+                                , ty = IntTy
+                                , bodyExpr = LitExpr {anno=IntTy, lit=IntLit 337733}
+                                }
+                              }
+                            , LetGdef
+                              { bind =
+                                Bind
+                                { ident = Ident "b"
+                                , ty = IntTy
+                                , bodyExpr = LitExpr {anno=IntTy, lit=IntLit 909}
+                                }
+                              }
+                            ]
+                          }
+      actual `shouldBe` expect
+
+    it "func" $ do
+        let prog1   = Program
+                      { gdefs =
+                        [ FuncGdef
+                          { ident = Ident "myfunc"
+                          , params = [Param {ident=Ident "p", ty=IntTy}, Param {ident=Ident "q", ty=CharTy}]
+                          , retTy = IntTy
+                          , bodyExpr = IdentExpr{anno=(), ident=Ident "p"}
+                          }
+                        ]
+                      }
+        let actual  = programToTypedProgram prog1
+        let expect  = Right Program
+                            { gdefs =
+                              [ FuncGdef
+                                { ident = Ident "myfunc"
+                                , params = [Param {ident=Ident "p", ty=IntTy}, Param {ident=Ident "q", ty=CharTy}]
+                                , retTy = IntTy
+                                , bodyExpr = IdentExpr{anno=IntTy, ident=Ident "p"}
+                                }
+                              ]
+                            }
+        actual `shouldBe` expect
