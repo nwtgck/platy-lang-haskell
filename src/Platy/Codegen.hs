@@ -52,41 +52,6 @@ litToLLVMType (BoolLit _) = AST.IntegerType {typeBits=nBoolBits}
 litToLLVMType (UnitLit)   = AST.IntegerType {typeBits=nUnitBits}
 
 
--- | Literal => Ty
--- TODO: Remove
-litToTy :: Lit -> Ty
-litToTy (IntLit _)  = IntTy
-litToTy (CharLit _) = CharTy
-litToTy (BoolLit _) = BoolTy
-litToTy (UnitLit)   = UnitTy
-
-
--- | Expr => LLVM Type
--- TODO: Remove
-exprToTy :: VarTable -> [VarTable] -> Expr Ty -> Either SemanticError Ty
-exprToTy gVarTable lVarTables (LitExpr {lit})       = return $ litToTy lit
-exprToTy gVarTable lVarTables (IdentExpr {ident=ident@(Ident name)}) = do
-  let identInfoMaybe = lookupLVarTables ident lVarTables <|> Map.lookup ident gVarTable
-      notFoundError = SemanticError{errorCode=NoSuchIdentEC, errorMessage=[Here.i| Identifier '${name}' is not found|]}
-  -- Get identifier information
-  identInfo <- Either.Utils.maybeToEither notFoundError identInfoMaybe
-  case identInfo of
-     GVarIdentInfo{ty} -> return ty
-     LVarIdentInfo{ty} -> return ty
-     FuncIdentInfo{}   -> fail [Here.i| Identifier '${name}' should be variable not function|]
-exprToTy gVarTable lVarTables (IfExpr {thenExpr}) = exprToTy gVarTable lVarTables thenExpr
-exprToTy gVarTable lVarTables (ApplyExpr{calleeIdent=calleeIdent@(Ident name)}) = do
-  let identInfoMaybe = Map.lookup calleeIdent gVarTable
-      notFoundError = SemanticError{errorCode=NoSuchIdentEC, errorMessage=[Here.i| Identifier '${name}' is not found|]}
-  -- Get identifier information
-  identInfo <- Either.Utils.maybeToEither notFoundError identInfoMaybe
-  case identInfo of
-    GVarIdentInfo{}      -> fail [Here.i| Identifier '${name}' should be function, but variable|]
-    LVarIdentInfo{}      -> fail [Here.i| Unexpected error: '${name}' should be global function|]
-    FuncIdentInfo{retTy} -> return retTy
-exprToTy gVarTable lVarTables (LetExpr{inExpr})   = exprToTy gVarTable lVarTables inExpr
-
-
 data IdentInfo =
   GVarIdentInfo {ty :: Ty, globalPtrName :: AST.Name} |
   LVarIdentInfo {ty :: Ty, localName :: AST.Name} |
@@ -291,7 +256,7 @@ exprToExprCodegen (ApplyExpr {calleeIdent=calleeIdent@(Ident calleeName), argExp
       return $ AST.LocalReference llvmRetTy resName
     _  -> fail ([Here.i|Should be function identifier |])
 
-exprToExprCodegen (ifexpr@IfExpr {condExpr, thenExpr, elseExpr}) = do
+exprToExprCodegen (ifexpr@IfExpr {anno, condExpr, thenExpr, elseExpr}) = do
   -- Get fresh count for prefix of label
   freshCount <- getFreshCount
   -- Label prefix
@@ -311,7 +276,7 @@ exprToExprCodegen (ifexpr@IfExpr {condExpr, thenExpr, elseExpr}) = do
   -- Get local variable tables
   lVarTables <- gets localVarTables
   -- Get type
-  ty         <- ExprCodegen $ Monad.Trans.lift (exprToTy gVarTable lVarTables ifexpr)
+  let ty     =  anno
   -- Get LLVM type
   let llvmTy = tyToLLVMTy ty
 
@@ -410,7 +375,7 @@ gdefToGdefCodegen globalVarTable (LetGdef (Bind {ident=ident@(Ident name), ty, b
   -- Add the definition
   addDefinition globalDef
   -- Get type of bodyExpr
-  bodyExprTy <- GdefCodegen $ lift $ exprToTy globalVarTable [] bodyExpr
+  let bodyExprTy =  anno bodyExpr
   if bodyExprTy == ty
     then do
       -- Evaluate bodyExpr
