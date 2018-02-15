@@ -24,7 +24,6 @@ import Platy.Datatypes
 import qualified Platy.Utils as Utils
 
 -- | Error code
--- TODO: Rename
 data ErrorCode =
     NoSuchIdentEC
   | TypeMismatchEC
@@ -33,7 +32,6 @@ data ErrorCode =
   deriving (Eq, Show)
 
 -- | Semantic error
--- TODO: Rename
 data SemanticError =
  SemanticError
  { errorCode    :: ErrorCode
@@ -65,31 +63,6 @@ litToTy (IntLit _)  = IntTy
 litToTy (CharLit _) = CharTy
 litToTy (BoolLit _) = BoolTy
 litToTy (UnitLit)   = UnitTy
-
--- | Expr => LLVM Type
--- TODO: Remove
-exprToTy :: VarTable -> [VarTable] -> (Expr ()) -> Either SemanticError Ty
-exprToTy gVarTable lVarTables (LitExpr {lit})       = return $ litToTy lit
-exprToTy gVarTable lVarTables (IdentExpr {ident=ident@(Ident name)}) = do
-  let identInfoMaybe = Utils.lookupMaps ident lVarTables <|> Map.lookup ident gVarTable
-      notFoundError = SemanticError{errorCode=NoSuchIdentEC, errorMessage=[Here.i| Identifier '${name}' is not found|]}
-  -- Get identifier information
-  identInfo <- Either.Utils.maybeToEither notFoundError identInfoMaybe
-  case identInfo of
-     GVarIdentInfo{ty} -> return ty
-     LVarIdentInfo{ty} -> return ty
-     FuncIdentInfo{}   -> fail [Here.i| Identifier '${name}' should be variable not function|]
-exprToTy gVarTable lVarTables (IfExpr {thenExpr}) = exprToTy gVarTable lVarTables thenExpr
-exprToTy gVarTable lVarTables (ApplyExpr{calleeIdent=calleeIdent@(Ident name)}) = do
-  let identInfoMaybe = Map.lookup calleeIdent gVarTable
-      notFoundError = SemanticError{errorCode=NoSuchIdentEC, errorMessage=[Here.i| Identifier '${name}' is not found|]}
-  -- Get identifier information
-  identInfo <- Either.Utils.maybeToEither notFoundError identInfoMaybe
-  case identInfo of
-    GVarIdentInfo{}      -> fail [Here.i| Identifier '${name}' should be function, but variable|]
-    LVarIdentInfo{}      -> fail [Here.i| Unexpected error: '${name}' should be global function|]
-    FuncIdentInfo{retTy} -> return retTy
-exprToTy gVarTable lVarTables (LetExpr{inExpr})   = exprToTy gVarTable lVarTables inExpr
 
 
 -- | Push & Pop a local variable map
@@ -222,7 +195,7 @@ programToTypedProgram :: Program () -> Either SemanticError (Program Ty)
 programToTypedProgram Program{gdefs} = do
   let f LetGdef {bind=Bind {ident, ty}} = (ident, GVarIdentInfo {ty=ty})
       f FuncGdef {ident, retTy, params} = (ident, FuncIdentInfo {retTy=retTy, paramTys=[ty | Param {ty} <- params]})
-      -- TODO: <Find duplicated indentifier>
+      -- TODO: <Find duplicated identifiers>
       globalVarMap = Map.fromList (fmap f gdefs)
 
       -- TODO: Remove `stdVarMap` in the future

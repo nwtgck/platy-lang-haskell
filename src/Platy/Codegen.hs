@@ -119,12 +119,6 @@ stackInstruction :: Named AST.Instruction -> ExprCodegen ()
 stackInstruction instr = do
   modify (\env@ExprCodegenEnv{stackedInstrs} -> env{stackedInstrs=stackedInstrs++[instr]})
 
--- | Look up local variable tables
--- TODO: Use Utils.lookupMaps
-lookupLVarTables :: Ident -> [VarTable] -> Maybe IdentInfo
-lookupLVarTables _     []     = Nothing
-lookupLVarTables ident (v:vs) = Map.lookup ident v <|> lookupLVarTables ident vs
-
 
 -- | Push & Pop a local variable map
 withLVarTable :: Map Ident IdentInfo -> ExprCodegen a -> ExprCodegen a
@@ -145,7 +139,7 @@ exprToExprCodegen (IdentExpr {ident=ident@(Ident name)}) = do
   -- Get global variable table
   gVarTable  <- gets globalVarTable
   -- Find ident from tables (NOTE: Semantic analysis keeps it safe)
-  let Just indentInfo = lookupLVarTables ident lVarTables <|> Map.lookup ident gVarTable
+  let Just indentInfo = lookupMaps ident lVarTables <|> Map.lookup ident gVarTable
   case indentInfo of
     GVarIdentInfo{ty, globalPtrName} -> do
       let llvmTy    = tyToLLVMTy ty

@@ -29,15 +29,6 @@ data Ty =
 data Bind anno = Bind {ident :: Ident, ty :: Ty, bodyExpr :: Expr anno}
   deriving (Show, Eq)
 
----- | Expression
---data Expr =
---  LitExpr Lit |
---  IdentExpr Ident |
---  IfExpr {condExpr :: Expr, thenExpr :: Expr, elseExpr :: Expr} |
---  ApplyExpr {calleeIdent :: Ident, argExprs :: [Expr]} |
---  LetExpr {binds :: [Bind], inExpr :: Expr}
---  deriving (Show, Eq)
-
 -- | Expression
 data Expr anno =
   LitExpr   {anno :: anno, lit :: Lit } |
@@ -47,19 +38,10 @@ data Expr anno =
   LetExpr   {anno :: anno, binds :: [Bind anno], inExpr :: Expr anno}
   deriving (Show, Eq)
 
---type Exp = Expr ()
---pattern LitExpr lit = AnnoLitExpr{anno=(), lit=lit}
---pattern IdentExpr ident = AnnoIdentExpr{anno=(), ident=ident}
---pattern IfExpr{condExpr, thenExpr, elseExpr} = AnnoIfExpr{anno=(), condExpr=condExpr, thenExpr=thenExpr, elseExpr=elseExpr}
 
 -- | Parameter
 data Param = Param {ident :: Ident, ty :: Ty}
   deriving (Show, Eq)
-
----- | Typed expression
---data TypedExpr = TypedExpr {ty :: Ty, expr :: Expr}
---
---pattern LetExpr2{binds2, inExpr2}= LetExpr {binds=binds2, inExpr=inExpr2}
 
 
 -- | Global definition
