@@ -106,6 +106,31 @@ exprToTypedExpr IdentExpr{ident=ident@(Ident name)} = do
      GVarIdentInfo{ty} -> return IdentExpr {anno=ty, ident}
      LVarIdentInfo{ty} -> return IdentExpr {anno=ty, ident}
      FuncIdentInfo{}   -> fail [Here.i| Identifier '${name}' should be variable not function|]
+exprToTypedExpr IfExpr {condExpr, thenExpr, elseExpr} = do
+  -- Condition
+  typedCondExpr <- exprToTypedExpr condExpr
+  -- Then
+  typedThenExpr <- exprToTypedExpr thenExpr
+  -- Else
+  typedElseExpr <- exprToTypedExpr elseExpr
+
+  let condTy :: Ty
+      condTy = anno typedCondExpr
+      thenTy :: Ty
+      thenTy = anno typedThenExpr
+      elseTy :: Ty
+      elseTy = anno typedElseExpr
+
+  if condTy == BoolTy -- Condition should be bool
+    then do
+      if thenTy == elseTy -- types of then and else are the same
+        then do
+          return IfExpr {anno=thenTy, condExpr=typedCondExpr, thenExpr=typedThenExpr, elseExpr=typedElseExpr}
+        else
+          SemanticCheck $ Monad.Trans.lift $ Left SemanticError2{errorCode=TypeMismatchEC, errorMessage=[Here.i| Types of then and else should be the same, but then: ${thenTy}, else: ${elseTy} found|]}
+    else
+      SemanticCheck $ Monad.Trans.lift $ Left SemanticError2{errorCode=TypeMismatchEC, errorMessage=[Here.i| Condtion should be Bool type, but '${condTy}' found|]}
+
 -- TODO: impl other patterns
 
 gdefToTypedGdef :: Gdef () -> Gdef Ty

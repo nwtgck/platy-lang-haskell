@@ -60,3 +60,44 @@ spec = do
       let actual  = Monad.State.evalStateT (runSemanticCheck (exprToTypedExpr expr1)) initEnv
       let expect  = Right IdentExpr {anno=IntTy, ident=Ident "a"}
       actual `shouldBe` expect
+
+    it "if expression" $ do
+      let expr1   = IfExpr
+                    { anno = ()
+                    , condExpr =
+                      LitExpr
+                      { anno = ()
+                      , lit = BoolLit True
+                      }
+                    , thenExpr =
+                      LitExpr
+                      { anno = ()
+                      , lit = IntLit 18181
+                      }
+                    , elseExpr =
+                      LitExpr
+                      { anno = ()
+                      , lit = IntLit 2332
+                      }
+                    }
+      let initEnv = SemanticCheckEnv {globalVarTable=Map.empty, localVarTables=[]}
+      let actual  = Monad.State.evalStateT (runSemanticCheck (exprToTypedExpr expr1)) initEnv
+      let expect  = Right IfExpr
+                          { anno = IntTy
+                          , condExpr =
+                            LitExpr
+                            { anno = BoolTy
+                            , lit = BoolLit True
+                            }
+                          , thenExpr =
+                            LitExpr
+                            { anno = IntTy
+                            , lit = IntLit 18181
+                            }
+                          , elseExpr =
+                            LitExpr
+                            { anno = IntTy
+                            , lit = IntLit 2332
+                            }
+                          }
+      actual `shouldBe` expect
