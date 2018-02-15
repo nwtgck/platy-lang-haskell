@@ -53,6 +53,7 @@ litToLLVMType (UnitLit)   = AST.IntegerType {typeBits=nUnitBits}
 
 
 -- | Literal => Ty
+-- TODO: Remove
 litToTy :: Lit -> Ty
 litToTy (IntLit _)  = IntTy
 litToTy (CharLit _) = CharTy
@@ -104,7 +105,7 @@ data ExprCodegenEnv =
  }
  deriving (Show)
 
-
+-- TODO: Remove (use SemanticCheck.ErrorCode)
 -- | Error code
 data ErrorCode =
     NoSuchIdentEC
@@ -112,6 +113,7 @@ data ErrorCode =
   | UnexpectedEC
   deriving (Eq, Show)
 
+-- TODO: Remove (use SemanticCheck.SemanticError)
 -- | Semantic error
 data SemanticError =
  SemanticError
@@ -169,6 +171,7 @@ stackInstruction instr = do
   modify (\env@ExprCodegenEnv{stackedInstrs} -> env{stackedInstrs=stackedInstrs++[instr]})
 
 -- | Look up local variable tables
+-- TODO: Use Utils.lookupMaps
 lookupLVarTables :: Ident -> [VarTable] -> Maybe IdentInfo
 lookupLVarTables _     []     = Nothing
 lookupLVarTables ident (v:vs) = Map.lookup ident v <|> lookupLVarTables ident vs
