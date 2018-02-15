@@ -1,0 +1,7 @@
+(@func a [] Int
+    'a'
+)
+
+(@func main [] Unit
+    Unit
+)
