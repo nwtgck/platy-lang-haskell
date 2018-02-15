@@ -28,6 +28,7 @@ import qualified Platy.Utils as Utils
 data ErrorCode2 =
     NoSuchIdentEC
   | TypeMismatchEC
+  | ArgsNumMismatchEC
   | UnexpectedEC
   deriving (Eq, Show)
 
@@ -130,6 +131,28 @@ exprToTypedExpr IfExpr {condExpr, thenExpr, elseExpr} = do
           SemanticCheck $ Monad.Trans.lift $ Left SemanticError2{errorCode=TypeMismatchEC, errorMessage=[Here.i| Types of then and else should be the same, but then: ${thenTy}, else: ${elseTy} found|]}
     else
       SemanticCheck $ Monad.Trans.lift $ Left SemanticError2{errorCode=TypeMismatchEC, errorMessage=[Here.i| Condtion should be Bool type, but '${condTy}' found|]}
+exprToTypedExpr ApplyExpr{calleeIdent=calleeIdent@(Ident name), argExprs} = do
+  -- Type argExpr
+  typedArgExprs <- mapM exprToTypedExpr argExprs
+  -- Get global variable table
+  gVarTable <- gets globalVarTable
+  -- Get identifier information
+  identInfo <- let identInfoMaybe = Map.lookup calleeIdent gVarTable
+                   notFoundError  = SemanticError2{errorCode=NoSuchIdentEC, errorMessage=[Here.i| Identifier '${name}' is not found|]}
+               in SemanticCheck $ Monad.Trans.lift $ Either.Utils.maybeToEither notFoundError identInfoMaybe
+  case identInfo of
+    GVarIdentInfo{}      -> fail [Here.i| Identifier '${name}' should be function, but variable|]
+    LVarIdentInfo{}      -> fail [Here.i| Unexpected error: '${name}' should be global function|]
+    FuncIdentInfo{retTy, paramTys} -> do
+      if length paramTys == length typedArgExprs
+        then do
+          let actualArgTys = fmap anno typedArgExprs
+          if paramTys == actualArgTys
+          then return ApplyExpr{anno=retTy, calleeIdent, argExprs=typedArgExprs}
+          else
+            SemanticCheck $ Monad.Trans.lift $ Left SemanticError2{errorCode=TypeMismatchEC, errorMessage=[Here.i| The argument should be '${paramTys}', but '${actualArgTys}'|]}
+        else
+          SemanticCheck $ Monad.Trans.lift $ Left SemanticError2{errorCode=TypeMismatchEC, errorMessage=[Here.i| The number of arguments should be ${length paramTys}, but ${length typedArgExprs}|]}
 
 -- TODO: impl other patterns
 

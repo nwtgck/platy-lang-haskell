@@ -101,3 +101,47 @@ spec = do
                             }
                           }
       actual `shouldBe` expect
+
+
+    it "apply" $ do
+      let expr1   = ApplyExpr
+                    { anno = ()
+                    , calleeIdent = Ident "myfunc"
+                    , argExprs =
+                      [ LitExpr
+                        { anno = ()
+                        , lit = BoolLit False
+                        }
+                      , LitExpr
+                        { anno = ()
+                        , lit = CharLit 's'
+                        }
+                      ]
+                    }
+      let initEnv = SemanticCheckEnv
+                    { globalVarTable =
+                      Map.fromList
+                        [ ( Ident "myfunc"
+                          , FuncIdentInfo
+                            { retTy = IntTy
+                            , paramTys = [BoolTy, CharTy]
+                            })
+                        ]
+                    , localVarTables = []
+                    }
+      let actual  = Monad.State.evalStateT (runSemanticCheck (exprToTypedExpr expr1)) initEnv
+      let expect  = Right ApplyExpr
+                          { anno = IntTy
+                          , calleeIdent = Ident "myfunc"
+                          , argExprs =
+                            [ LitExpr
+                              { anno = BoolTy
+                              , lit = BoolLit False
+                              }
+                            , LitExpr
+                              { anno = CharTy
+                              , lit = CharLit 's'
+                              }
+                            ]
+                          }
+      actual `shouldBe` expect
