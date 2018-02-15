@@ -91,6 +91,18 @@ exprToTy gVarTable lVarTables (ApplyExpr{calleeIdent=calleeIdent@(Ident name)}) 
     FuncIdentInfo{retTy} -> return retTy
 exprToTy gVarTable lVarTables (LetExpr{inExpr})   = exprToTy gVarTable lVarTables inExpr
 
+
+-- | Push & Pop a local variable map
+withLVarTable :: Map Ident IdentInfo -> SemanticCheck a -> SemanticCheck a
+withLVarTable lVarMap f = do
+  -- Push `lVarMap` to  `localVarTables`
+  modify (\env@SemanticCheckEnv{localVarTables} -> env{localVarTables=lVarMap:localVarTables})
+  ret <- f
+  -- Pop lVarMap` from  `localVarTables`
+  modify (\env@SemanticCheckEnv{localVarTables=_:rest} -> env{localVarTables=rest})
+  return ret
+
+
 -- | Expr () => Expr Ty
 exprToTypedExpr :: Expr () -> SemanticCheck (Expr Ty)
 exprToTypedExpr LitExpr {lit} = return LitExpr{anno=litToTy lit, lit=lit}
@@ -152,9 +164,31 @@ exprToTypedExpr ApplyExpr{calleeIdent=calleeIdent@(Ident name), argExprs} = do
           else
             SemanticCheck $ Monad.Trans.lift $ Left SemanticError2{errorCode=TypeMismatchEC, errorMessage=[Here.i| The argument should be '${paramTys}', but '${actualArgTys}'|]}
         else
-          SemanticCheck $ Monad.Trans.lift $ Left SemanticError2{errorCode=TypeMismatchEC, errorMessage=[Here.i| The number of arguments should be ${length paramTys}, but ${length typedArgExprs}|]}
+          SemanticCheck $ Monad.Trans.lift $ Left SemanticError2{errorCode=ArgsNumMismatchEC, errorMessage=[Here.i| The number of arguments should be ${length paramTys}, but ${length typedArgExprs}|]}
+exprToTypedExpr LetExpr{binds, inExpr} = do
+  -- TODO: Rename better
+  let f :: (Map Ident IdentInfo, [Bind Ty]) -> Bind () -> SemanticCheck (Map Ident IdentInfo, [Bind Ty])
+      f (lVarMap, typedBinds) (Bind {ident=ident@(Ident name), ty, bodyExpr}) = do
+        withLVarTable lVarMap $ do -- NOTE: push & pop (lVarMap)
+          -- Type bodyExpr
+          typedBodyExpr <- exprToTypedExpr bodyExpr
+          let actualBodyTy :: Ty
+              actualBodyTy = anno typedBodyExpr
+          if ty == actualBodyTy
+            then do
+              let newlVarMap = Map.insert ident (LVarIdentInfo{ty=ty}) lVarMap
+              let typedBind  = Bind {ident, ty, bodyExpr=typedBodyExpr}
+              return (newlVarMap, typedBinds ++ [typedBind])
+            else
+              SemanticCheck $ Monad.Trans.lift $ Left SemanticError2{errorCode=TypeMismatchEC, errorMessage=[Here.i| Type of the expresson should be '${ty}' but found '${actualBodyTy}'|]}
 
--- TODO: impl other patterns
+  -- Define all binds
+  (localVariableMap, typedBinds) <- Foldable.foldlM f (Map.empty :: Map Ident IdentInfo, [] :: [Bind Ty]) binds
+  -- Get typedInExpr
+  typedInExpr <- withLVarTable localVariableMap $ do -- NOTE: push & pop (localVariableMap)
+    -- Type inExpr
+    exprToTypedExpr inExpr
+  return LetExpr{anno=anno typedInExpr, binds=typedBinds, inExpr=typedInExpr}
 
 gdefToTypedGdef :: Gdef () -> Gdef Ty
 gdefToTypedGdef = undefined

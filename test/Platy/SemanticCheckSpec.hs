@@ -145,3 +145,40 @@ spec = do
                             ]
                           }
       actual `shouldBe` expect
+
+    it "let-expression" $ do
+      let expr1   = LetExpr
+                     { anno = ()
+                     , binds =
+                       [ Bind
+                         { ident = Ident "a"
+                         , ty = IntTy
+                         , bodyExpr = LitExpr {anno=(), lit=IntLit 889922}
+                         }
+                       , Bind
+                         { ident = Ident "b"
+                         , ty = CharTy
+                         , bodyExpr = LitExpr {anno=(), lit=CharLit 'j'}
+                         }
+                       ]
+                     , inExpr = IdentExpr{anno=(), ident=Ident "a"}
+                     }
+      let initEnv = SemanticCheckEnv {globalVarTable=Map.empty, localVarTables=[]}
+      let actual  = Monad.State.evalStateT (runSemanticCheck (exprToTypedExpr expr1)) initEnv
+      let expect  = Right LetExpr
+                           { anno = IntTy
+                           , binds =
+                             [ Bind
+                               { ident = Ident "a"
+                               , ty = IntTy
+                               , bodyExpr = LitExpr {anno=IntTy, lit=IntLit 889922}
+                               }
+                             , Bind
+                               { ident = Ident "b"
+                               , ty = CharTy
+                               , bodyExpr = LitExpr {anno=CharTy, lit=CharLit 'j'}
+                               }
+                             ]
+                           , inExpr = IdentExpr{anno=IntTy, ident=Ident "a"}
+                           }
+      actual `shouldBe` expect
