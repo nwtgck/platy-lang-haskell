@@ -224,6 +224,36 @@ programToTypedProgram Program{gdefs} = do
       f FuncGdef {ident, retTy, params} = (ident, FuncIdentInfo {retTy=retTy, paramTys=[ty | Param {ty} <- params]})
       -- TODO: <Find duplicated indentifier>
       globalVarMap = Map.fromList (fmap f gdefs)
+
+      -- TODO: Remove `stdVarMap` in the future
+      stdVarMap = Map.fromList [ ( Ident "print-int"
+                                , FuncIdentInfo
+                                  { retTy = UnitTy
+                                  , paramTys = [IntTy]
+                                  })
+                              , ( Ident "eq-int"
+                                , FuncIdentInfo
+                                  { retTy = BoolTy
+                                  , paramTys = [IntTy, IntTy]
+                                  })
+
+                              , ( Ident "add-int"
+                                , FuncIdentInfo
+                                  { retTy = IntTy
+                                  , paramTys = [IntTy, IntTy]
+                                  })
+
+                              , ( Ident "sub-int"
+                                , FuncIdentInfo
+                                  { retTy = IntTy
+                                  , paramTys = [IntTy, IntTy]
+                                  })
+                              , ( Ident "or"
+                                , FuncIdentInfo
+                                  { retTy = BoolTy
+                                  , paramTys = [BoolTy, BoolTy]
+                                  })
+                              ]
   --Type gdefs
-  typedGdefs <- mapM (gdefToTypedGdef globalVarMap) gdefs
+  typedGdefs <- mapM (gdefToTypedGdef (Map.union globalVarMap stdVarMap)) gdefs
   return Program{gdefs=typedGdefs}

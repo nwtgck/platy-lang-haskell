@@ -20,6 +20,7 @@ import qualified LLVM.Pretty
 import Platy.Utils
 import Platy.Datatypes
 import Platy.Codegen
+import Platy.SemanticCheck
 
 -- | Convert a module to executable and Run it and Get stdout
 execModule :: AST.Module -> IO String
@@ -43,11 +44,17 @@ execModule llvmMod = do
     IO.hGetContents stdoutHandle
 
 
--- | Convert Program => Module => Execute it => Stdout
+-- | Convert Program () => Program Ty => Module => Execute it => Stdout
 execProgram :: Program () -> IO String
 execProgram program = do
+  -- Type program
+  let typedProgramEither = programToTypedProgram program
+  -- Is right or not
+  typedProgramEither `shouldSatisfy` Either.isRight
+  -- Extract module
+  let Right typedProgram = typedProgramEither
   -- Generate LLVM module
-  let llvmModEither = programToModule program
+  let llvmModEither = programToModule typedProgram
   -- Is right or not
   llvmModEither `shouldSatisfy` Either.isRight
   -- Extract module

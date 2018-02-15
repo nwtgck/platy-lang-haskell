@@ -62,7 +62,8 @@ litToTy (UnitLit)   = UnitTy
 
 
 -- | Expr => LLVM Type
-exprToTy :: VarTable -> [VarTable] -> (Expr ()) -> Either SemanticError Ty
+-- TODO: Remove
+exprToTy :: VarTable -> [VarTable] -> Expr Ty -> Either SemanticError Ty
 exprToTy gVarTable lVarTables (LitExpr {lit})       = return $ litToTy lit
 exprToTy gVarTable lVarTables (IdentExpr {ident=ident@(Ident name)}) = do
   let identInfoMaybe = lookupLVarTables ident lVarTables <|> Map.lookup ident gVarTable
@@ -188,7 +189,7 @@ withLVarTable lVarMap f = do
   return ret
 
 -- | Expr => Operand
-exprToExprCodegen :: (Expr ()) -> ExprCodegen AST.Operand
+exprToExprCodegen :: Expr Ty -> ExprCodegen AST.Operand
 exprToExprCodegen (LitExpr {lit}) = return (litToOperand lit)
 exprToExprCodegen (IdentExpr {ident=ident@(Ident name)}) = do
   -- Get local variable tables
@@ -222,7 +223,7 @@ exprToExprCodegen (LetExpr {binds, inExpr}) = do
   prefixNumber <- getFreshCount
 
   -- TODO: Rename better
-  let f :: Map Ident IdentInfo -> Bind () -> ExprCodegen (Map Ident IdentInfo)
+  let f :: Map Ident IdentInfo -> Bind Ty -> ExprCodegen (Map Ident IdentInfo)
       f lVarMap (Bind {ident=ident@(Ident name), ty, bodyExpr}) = do
         withLVarTable lVarMap $ do -- NOTE: push & pop (lVarMap)
           -- Eval bodyExpr to operand
@@ -350,8 +351,8 @@ exprToExprCodegen (ifexpr@IfExpr {condExpr, thenExpr, elseExpr}) = do
   return $ AST.LocalReference llvmTy endValueName
 
 
--- | Expr => Operand
-exprToOperandEither :: VarTable -> [VarTable] -> Expr () -> Either SemanticError (AST.Operand, ExprCodegenEnv)
+-- | Expr Ty => Operand
+exprToOperandEither :: VarTable -> [VarTable] -> Expr Ty -> Either SemanticError (AST.Operand, ExprCodegenEnv)
 exprToOperandEither globalVarTable localVarTables expr = runStateT (runExprCodegen $ exprToExprCodegen expr) initEnv
   where
     initEnv = ExprCodegenEnv {
@@ -399,7 +400,7 @@ genParamName :: Ident -> AST.Name
 genParamName (Ident name) = AST.Name (strToShort [Here.i|$$param/${name}|])
 
 -- Gdef => GdefCodegen
-gdefToGdefCodegen :: VarTable -> Gdef () -> GdefCodegen ()
+gdefToGdefCodegen :: VarTable -> Gdef Ty -> GdefCodegen ()
 gdefToGdefCodegen globalVarTable (LetGdef (Bind {ident=ident@(Ident name), ty, bodyExpr})) = do
   let globalName   = genGlobalVarName ident
       initFuncName = AST.Name (strToShort [Here.i|$$PLATY_INIT/${name}|])
@@ -520,8 +521,8 @@ gdefToGdefCodegen globalVarTable (FuncGdef {ident=ident@(Ident name), params, re
   return ()
 
 
--- | Program => AST.Module
-programToModule :: Program () -> Either SemanticError AST.Module
+-- | Program Ty => AST.Module
+programToModule :: Program Ty -> Either SemanticError AST.Module
 programToModule Program{gdefs} = do
   let initEnv = GdefCodegenEnv {
                   definitions         = []

@@ -16,6 +16,7 @@ import qualified System.FilePath.Posix as FilePath.Posix
 import Platy.Datatypes
 import Platy.Utils
 import Platy.Parser
+import Platy.SemanticCheck
 import Platy.Codegen
 import qualified Platy.TestUtils as  TestUtils
 
@@ -79,12 +80,12 @@ spec = do
         programEither `shouldSatisfy` Either.isRight
         -- Extract program
         let Right program = programEither
-        -- Generate LLVM module
-        let llvmModEither = programToModule program
-        -- Is left or not
-        llvmModEither `shouldSatisfy` Either.isLeft
+        -- Type program
+        let typedProgramEither = programToTypedProgram program
+        -- Is right or not
+        typedProgramEither `shouldSatisfy` Either.isLeft
         -- Extract error
-        let Left SemanticError{errorCode} = llvmModEither
+        let Left SemanticError2{errorCode} = typedProgramEither
         -- String expression of error code
         let errorCodeStr = show errorCode
         -- Compare with expectation
