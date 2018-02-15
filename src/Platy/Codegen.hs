@@ -36,22 +36,8 @@ import Debug.Trace
 import Platy.Constants
 import Platy.Utils
 import Platy.Datatypes
-import Platy.NativeStdlib
-
--- | Ty => LLVM Type
-tyToLLVMTy :: Ty -> AST.Type
-tyToLLVMTy IntTy  = AST.IntegerType {typeBits=nIntBits}
-tyToLLVMTy CharTy = AST.IntegerType {typeBits=nCharBits}
-tyToLLVMTy BoolTy = AST.IntegerType {typeBits=nBoolBits}
-tyToLLVMTy UnitTy = AST.IntegerType {typeBits=nUnitBits}
-
--- | Lit => LLVM Type
-litToLLVMType :: Lit -> AST.Type
-litToLLVMType (IntLit _)  = AST.IntegerType {typeBits=nIntBits}
-litToLLVMType (CharLit _) = AST.IntegerType {typeBits=nCharBits}
-litToLLVMType (BoolLit _) = AST.IntegerType {typeBits=nBoolBits}
-litToLLVMType (UnitLit)   = AST.IntegerType {typeBits=nUnitBits}
-
+import Platy.CodegenUtils
+import qualified Platy.NativeStdlib as  NativeStdlib
 
 data IdentInfo =
   GVarIdentInfo {ty :: Ty, globalPtrName :: AST.Name} |
@@ -84,13 +70,6 @@ getFreshCount = do
   modify (\env -> env {count = c+1})
   return c
 
-
--- | Lit => Operand
-litToOperand :: Lit -> AST.Operand
-litToOperand (IntLit i)   = AST.ConstantOperand AST.Constant.Int {AST.Constant.integerBits=nIntBits, AST.Constant.integerValue=toInteger i}
-litToOperand (CharLit ch) = AST.ConstantOperand AST.Constant.Int {AST.Constant.integerBits=nCharBits, AST.Constant.integerValue=toInteger $ Data.Char.ord ch}
-litToOperand (BoolLit b)  = AST.ConstantOperand AST.Constant.Int {AST.Constant.integerBits=nBoolBits, AST.Constant.integerValue=if b then 1 else 0}
-litToOperand (UnitLit)    = AST.ConstantOperand AST.Constant.Int {AST.Constant.integerBits=nUnitBits, AST.Constant.integerValue=1}
 
 -- | Set current label
 addLabel :: AST.Name -> ExprCodegen ()
@@ -463,13 +442,13 @@ programToModule Program{gdefs} = do
       f (FuncGdef {ident, retTy, params})    = (ident, FuncIdentInfo {retTy=retTy, paramTys=[ty | Param {ty} <- params], funcName=genFuncName ident})
       globalVarMap = Map.fromList (fmap f gdefs)
 
-      stdVarMap = Map.map (\FuncNativeGdef {retTy,paramTys,funcLLVMName} ->
+      stdVarMap = Map.map (\NativeStdlib.FuncNativeGdef {retTy,paramTys,funcLLVMName} ->
                            FuncIdentInfo
                            { retTy
                            , paramTys
                            , funcName = funcLLVMName
                            })
-                       stdlibNativeGdefMap
+                       NativeStdlib.stdlibNativeGdefMap
 
   GdefCodegenEnv{definitions, globalInitFuncs} <- execStateT (runGdefCodegen $ mapM_ (gdefToGdefCodegen (Map.union globalVarMap stdVarMap)) gdefs) initEnv
 
@@ -494,106 +473,8 @@ programToModule Program{gdefs} = do
         }
       |]
 
-  -- TODO: `stdlibDefs` should move to stdlib for Platy
-  let stdlibDefs = [intFormatDef, printfDef, printIntDef, eqIntDef, addIntDef, subIntDef, orDef]
-        where
-          intFormatName = AST.Name "$$PLATY/int_format_str"
-          intFormatDef = [Quote.LLVM.lldef|
-            $gid:intFormatName = private constant [4 x i8] c"%d\0A\00"
-          |]
-          intFormatTy = AST.Type.ptr AST.ArrayType {
-                          AST.nArrayElements = 4
-                        , AST.elementType    = AST.IntegerType {AST.typeBits = 8}
-                        }
-          printfDef = [Quote.LLVM.lldef|
-            declare i32 @printf(i8*, ...)
-          |]
-
-
-          printIntParamName = AST.Name "value"
-          printIntParamTy   = tyToLLVMTy IntTy
-          chPtrName         = AST.Name "ch_ptr"
-          llvmUnitTy        = tyToLLVMTy UnitTy
-          llvmUnitValue     = litToOperand UnitLit
-
-          -- NOTE: `i1` is Unit Type
-          printIntDef = [Quote.LLVM.lldef|
-            define $type:llvmUnitTy @print-int($type:printIntParamTy $id:printIntParamName){
-            entry:
-                $id:chPtrName = $instr:gepInstr
-                $instr:callPrintfInstr
-                %unit_value = $opr:llvmUnitValue
-                ret $type:llvmUnitTy %unit_value
-            }
-          |]
-            where
-              -- FIXME: The following values shouldn't be not necessary, because all printIntDef is like the following IR. However llvm-hs-quote has error.
---              define void @"print-int"(i32 %v) {
---              entry:
---                call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([4 x i8], [4 x i8]* @int_format_str, i64 0, i64 0))
---                ret void
---              }
-              gepInstr = Left AST.GetElementPtr {
-                             AST.inBounds = False,
-                             AST.address  = AST.ConstantOperand $ AST.Constant.GlobalReference intFormatTy (intFormatName),
-                             AST.indices  = let i64Zero = AST.ConstantOperand AST.Constant.Int {AST.Constant.integerBits=64, AST.Constant.integerValue=0} in [i64Zero, i64Zero],
-                             AST.metadata = []
-                           }
-
-              printfTy = AST.Type.ptr
-                AST.FunctionType {
-                    AST.resultType    = AST.Type.i32
-                  , AST.argumentTypes = [AST.Type.ptr AST.Type.i8]
-                  , AST.isVarArg      = True
-                  }
-
-              callPrintfInstr = Left AST.Call {
-                                  AST.tailCallKind       = Nothing,
-                                  AST.callingConvention  = AST.CallingConvention.C,
-                                  AST.returnAttributes   = [],
-                                  AST.function           = Right $ AST.ConstantOperand $ AST.Constant.GlobalReference printfTy (AST.Name "printf"),
-                                  AST.arguments          = [(AST.LocalReference (AST.Type.ptr AST.Type.i8) (chPtrName), []), (AST.LocalReference (printIntParamTy) (printIntParamName), [])],
-                                  AST.functionAttributes = [],
-                                  AST.metadata           = []
-                                }
-
-          llvmBoolTy = tyToLLVMTy BoolTy
-          llvmIntTy  = tyToLLVMTy IntTy
-
-          -- eq-int
-          eqIntDef = [Quote.LLVM.lldef|
-            define $type:llvmBoolTy @eq-int($type:llvmIntTy %a, $type:llvmIntTy %b){
-              %res = icmp eq $type:llvmIntTy %a, %b
-              ret $type:llvmBoolTy %res
-            }
-          |]
-
-          -- add-int
-          addIntDef = [Quote.LLVM.lldef|
-            define $type:llvmIntTy @add-int($type:llvmIntTy %a, $type:llvmIntTy %b){
-              %res = add $type:llvmIntTy %a, %b
-              ret $type:llvmIntTy %res
-            }
-          |]
-
-          -- sub-int
-          subIntDef = [Quote.LLVM.lldef|
-            define $type:llvmIntTy @sub-int($type:llvmIntTy %a, $type:llvmIntTy %b){
-              %res = sub $type:llvmIntTy %a, %b
-              ret $type:llvmIntTy %res
-            }
-          |]
-
-          -- or
-          orDef = [Quote.LLVM.lldef|
-            define $type:llvmBoolTy @or($type:llvmBoolTy %a, $type:llvmBoolTy %b){
-              %res = or $type:llvmBoolTy %a, %b
-              ret $type:llvmBoolTy %res
-            }
-          |]
-
 
   return AST.defaultModule{
     AST.moduleDefinitions =
-      stdlibDefs ++ [globalCtorsDef, globalInitFuncDef]++ definitions ++ globalInitFuncs
+      NativeStdlib.stdlibLLVMDefs ++ [globalCtorsDef, globalInitFuncDef]++ definitions ++ globalInitFuncs
   }
