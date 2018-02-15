@@ -21,6 +21,7 @@ import Control.Applicative ((<|>))
 import qualified Data.Either.Utils as Either.Utils
 
 import Platy.Datatypes
+import Platy.NativeStdlib
 import qualified Platy.Utils as Utils
 
 -- | Error code
@@ -198,35 +199,12 @@ programToTypedProgram Program{gdefs} = do
       -- TODO: <Find duplicated identifiers>
       globalVarMap = Map.fromList (fmap f gdefs)
 
-      -- TODO: Remove `stdVarMap` in the future
-      stdVarMap = Map.fromList [ ( Ident "print-int"
-                                , FuncIdentInfo
-                                  { retTy = UnitTy
-                                  , paramTys = [IntTy]
-                                  })
-                              , ( Ident "eq-int"
-                                , FuncIdentInfo
-                                  { retTy = BoolTy
-                                  , paramTys = [IntTy, IntTy]
-                                  })
-
-                              , ( Ident "add-int"
-                                , FuncIdentInfo
-                                  { retTy = IntTy
-                                  , paramTys = [IntTy, IntTy]
-                                  })
-
-                              , ( Ident "sub-int"
-                                , FuncIdentInfo
-                                  { retTy = IntTy
-                                  , paramTys = [IntTy, IntTy]
-                                  })
-                              , ( Ident "or"
-                                , FuncIdentInfo
-                                  { retTy = BoolTy
-                                  , paramTys = [BoolTy, BoolTy]
-                                  })
-                              ]
+      stdVarMap = Map.map (\FuncNativeGdef {retTy,paramTys,funcLLVMName} ->
+                                 FuncIdentInfo
+                                 { retTy
+                                 , paramTys
+                                 })
+                             stdlibNativeGdefMap
   --Type gdefs
   typedGdefs <- mapM (gdefToTypedGdef (Map.union globalVarMap stdVarMap)) gdefs
   return Program{gdefs=typedGdefs}

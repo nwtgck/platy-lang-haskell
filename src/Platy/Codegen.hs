@@ -36,6 +36,7 @@ import Debug.Trace
 import Platy.Constants
 import Platy.Utils
 import Platy.Datatypes
+import Platy.NativeStdlib
 
 -- | Ty => LLVM Type
 tyToLLVMTy :: Ty -> AST.Type
@@ -462,40 +463,13 @@ programToModule Program{gdefs} = do
       f (FuncGdef {ident, retTy, params})    = (ident, FuncIdentInfo {retTy=retTy, paramTys=[ty | Param {ty} <- params], funcName=genFuncName ident})
       globalVarMap = Map.fromList (fmap f gdefs)
 
-      -- TODO: Remove `stdVarMap` in the future
-      stdVarMap = Map.fromList [ ( Ident "print-int"
-                                 , FuncIdentInfo
-                                   { retTy = UnitTy
-                                   , paramTys = [IntTy]
-                                   , funcName = AST.Name "print-int"
-                                   })
-                               , ( Ident "eq-int"
-                                 , FuncIdentInfo
-                                   { retTy = BoolTy
-                                   , paramTys = [IntTy, IntTy]
-                                   , funcName = AST.Name "eq-int"
-                                   })
-
-                               , ( Ident "add-int"
-                                 , FuncIdentInfo
-                                   { retTy = IntTy
-                                   , paramTys = [IntTy, IntTy]
-                                   , funcName = AST.Name "add-int"
-                                   })
-
-                               , ( Ident "sub-int"
-                                 , FuncIdentInfo
-                                   { retTy = IntTy
-                                   , paramTys = [IntTy, IntTy]
-                                   , funcName = AST.Name "sub-int"
-                                   })
-                               , ( Ident "or"
-                                 , FuncIdentInfo
-                                   { retTy = BoolTy
-                                   , paramTys = [BoolTy, BoolTy]
-                                   , funcName = AST.Name "or"
-                                   })
-                               ]
+      stdVarMap = Map.map (\FuncNativeGdef {retTy,paramTys,funcLLVMName} ->
+                           FuncIdentInfo
+                           { retTy
+                           , paramTys
+                           , funcName = funcLLVMName
+                           })
+                       stdlibNativeGdefMap
 
   GdefCodegenEnv{definitions, globalInitFuncs} <- execStateT (runGdefCodegen $ mapM_ (gdefToGdefCodegen (Map.union globalVarMap stdVarMap)) gdefs) initEnv
 
