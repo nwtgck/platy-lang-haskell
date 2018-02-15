@@ -80,7 +80,8 @@ listP p = do
   return as
 
 
-
+-- | Annotation for parsed expression
+type Annotation = ()
 
 -- | Parser of identifier
 identP :: Parsec String u Ident
@@ -121,18 +122,18 @@ litP = intLitP <|> boolLitP <|> charLitP <|> unitLitP
     unitLitP = ParsecChar.string unitLitStr >> return UnitLit
 
 -- | Parser of expression
-exprP :: Parsec String u Expr
+exprP :: Parsec String u (Expr Annotation)
 exprP = litExprP <|> identExprP <|> betweenParens (applyExprP <|> (ParsecChar.char keywordPrefixChar *> (ifExprP <|> letExprP)))
   where
     -- | Parser of literal expression
     litExprP = do
       lit <- litP
-      return $ LitExpr lit
+      return LitExpr {anno=(), lit}
 
     -- | Parser of identifier expression
     identExprP = do
       ident <- identP
-      return $ IdentExpr ident
+      return IdentExpr {anno=(), ident}
 
     -- | Parser of if expression
     ifExprP = do
@@ -147,7 +148,7 @@ exprP = litExprP <|> identExprP <|> betweenParens (applyExprP <|> (ParsecChar.ch
       Parsec.skipMany1 skipLangSpaceP
       -- else expression
       elseExpr <- exprP
-      return IfExpr {condExpr, thenExpr, elseExpr}
+      return IfExpr {anno=(), condExpr, thenExpr, elseExpr}
 
     -- | Parser of let-expression
     letExprP = do
@@ -159,14 +160,14 @@ exprP = litExprP <|> identExprP <|> betweenParens (applyExprP <|> (ParsecChar.ch
       Parsec.skipMany1 skipLangSpaceP
        -- expression
       inExpr <- exprP
-      return $ LetExpr {binds, inExpr}
+      return LetExpr {anno=(), binds, inExpr}
 
     -- | Parser of apply expression
     applyExprP = do
       calleeIdent <- identP
       Parsec.skipMany1 skipLangSpaceP
       argExprs <- listP exprP
-      return ApplyExpr {calleeIdent, argExprs}
+      return ApplyExpr {anno=(), calleeIdent, argExprs}
 
 -- Parser of param
 paramP :: Parsec String u Param
@@ -182,7 +183,7 @@ paramP = betweenParens $ do
   return Param{ident, ty}
 
 -- | Parser of bind
-bindP :: Parsec String u Bind
+bindP :: Parsec String u (Bind Annotation)
 bindP = do
   -- identifier
   ident <- identP
@@ -192,10 +193,10 @@ bindP = do
   Parsec.skipMany1 skipLangSpaceP
   -- expression
   bodyExpr <- exprP
-  return $ Bind{ident, ty, bodyExpr}
+  return Bind{ident, ty, bodyExpr}
 
 -- | Parser of Global Definition
-gdefP :: Parsec String u Gdef
+gdefP :: Parsec String u (Gdef Annotation)
 gdefP = betweenParens (ParsecChar.char keywordPrefixChar *> (letGdefP <|> funcGdefP))
   where
     letGdefP  = do
@@ -204,7 +205,7 @@ gdefP = betweenParens (ParsecChar.char keywordPrefixChar *> (letGdefP <|> funcGd
       Parsec.skipMany1 skipLangSpaceP
       -- Bind
       bind <- bindP
-      return $ LetGdef {bind}
+      return LetGdef {bind}
 
     funcGdefP = do
       -- @func
@@ -221,11 +222,11 @@ gdefP = betweenParens (ParsecChar.char keywordPrefixChar *> (letGdefP <|> funcGd
       Parsec.skipMany1 skipLangSpaceP
       -- expression
       bodyExpr <- exprP
-      return $ FuncGdef {ident, params, retTy, bodyExpr}
+      return FuncGdef {ident, params, retTy, bodyExpr}
 
 
 -- | Parser of program
-programP :: Parsec String u Program
+programP :: Parsec String u (Program Annotation)
 programP = do
   Parsec.skipMany skipLangSpaceP
   gdefs <- Parsec.many (gdefP <* Parsec.many skipLangSpaceP)

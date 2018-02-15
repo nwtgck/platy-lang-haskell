@@ -21,6 +21,7 @@ import Platy.Datatypes
 import Platy.Codegen
 import Platy.Utils
 import Platy.Parser
+import Platy.SemanticCheck
 
 import Paths_platy_lang (version)
 
@@ -84,38 +85,45 @@ main = do
   platyCode <- readFile platyFilePath
   -- Parse code
   let programEither = Parsec.parse programP platyFilePath platyCode
-  case programEither of
+  case programEither of -- TODO: Reduce dirty nest
     Right program -> do
-     -- Generate LLVM module
-     let llvmModuleEither = programToModule program
-     case llvmModuleEither of
-       Right llvmModule -> do
-        if emitLLVM
-          then do
-            -- Print LLVM IR
-            toLLVM llvmModule
-          else do
-            -- Generate object byte string
-            objBString <- toObjByteString llvmModule
-            -- Create temp directory
-            Temp.withSystemTempDirectory "tempdir" $ \dirpath -> do
-              -- Create empty obj file
-              objfilePath <- Temp.emptyTempFile dirpath "objfile"
-              -- Save obj to a file
-              ByteString.writeFile objfilePath objBString
-              -- Create empty executable file
-              let execfilePath = Maybe.fromMaybe (FilePath.Posix.takeBaseName platyFilePath) outputPathMay
-               -- Make executable file
-              Process.system [Here.i|gcc ${objfilePath} -o ${execfilePath}|]
-              Monad.when (not quiet) $
-              -- Print generated message
-                putStrLn [Here.i|Executable '${execfilePath}' generated|]
-              return ()
+     -- Semantic analysis
+     let typedProgramEither = programToTypedProgram program
+     case typedProgramEither of
+      Right typedProgram -> do
+         -- Generate LLVM module
+         let llvmModuleEither = programToModule typedProgram
+         case llvmModuleEither of
+           Right llvmModule -> do
+            if emitLLVM
+              then do
+                -- Print LLVM IR
+                toLLVM llvmModule
+              else do
+                -- Generate object byte string
+                objBString <- toObjByteString llvmModule
+                -- Create temp directory
+                Temp.withSystemTempDirectory "tempdir" $ \dirpath -> do
+                  -- Create empty obj file
+                  objfilePath <- Temp.emptyTempFile dirpath "objfile"
+                  -- Save obj to a file
+                  ByteString.writeFile objfilePath objBString
+                  -- Create empty executable file
+                  let execfilePath = Maybe.fromMaybe (FilePath.Posix.takeBaseName platyFilePath) outputPathMay
+                   -- Make executable file
+                  Process.system [Here.i|gcc ${objfilePath} -o ${execfilePath}|]
+                  Monad.when (not quiet) $
+                  -- Print generated message
+                    putStrLn [Here.i|Executable '${execfilePath}' generated|]
+                  return ()
 
-       Left err -> print err
-       -- TODO: Print to stdrr
-       -- TODO: Exit with error
-
+           Left err -> print err
+           -- TODO: Print to stdrr
+           -- TODO: Exit with error
+      Left err ->
+        print err
+        -- TODO: Print to stdrr
+        -- TODO: Exit with error
     Left parseErr -> print parseErr
     -- TODO: Print to stdrr
     -- TODO: Exit with error

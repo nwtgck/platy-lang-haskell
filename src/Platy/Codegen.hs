@@ -52,39 +52,6 @@ litToLLVMType (BoolLit _) = AST.IntegerType {typeBits=nBoolBits}
 litToLLVMType (UnitLit)   = AST.IntegerType {typeBits=nUnitBits}
 
 
--- | Literal => Ty
-litToTy :: Lit -> Ty
-litToTy (IntLit _)  = IntTy
-litToTy (CharLit _) = CharTy
-litToTy (BoolLit _) = BoolTy
-litToTy (UnitLit)   = UnitTy
-
-
--- | Expr => LLVM Type
-exprToTy :: VarTable -> [VarTable] -> Expr -> Either SemanticError Ty
-exprToTy gVarTable lVarTables (LitExpr lit)       = return $ litToTy lit
-exprToTy gVarTable lVarTables (IdentExpr (ident@(Ident name))) = do
-  let identInfoMaybe = lookupLVarTables ident lVarTables <|> Map.lookup ident gVarTable
-      notFoundError = SemanticError{errorCode=NoSuchIdentEC, errorMessage=[Here.i| Identifier '${name}' is not found|]}
-  -- Get identifier information
-  identInfo <- Either.Utils.maybeToEither notFoundError identInfoMaybe
-  case identInfo of
-     GVarIdentInfo{ty} -> return ty
-     LVarIdentInfo{ty} -> return ty
-     FuncIdentInfo{}   -> fail [Here.i| Identifier '${name}' should be variable not function|]
-exprToTy gVarTable lVarTables (IfExpr {thenExpr}) = exprToTy gVarTable lVarTables thenExpr
-exprToTy gVarTable lVarTables (ApplyExpr{calleeIdent=calleeIdent@(Ident name)}) = do
-  let identInfoMaybe = Map.lookup calleeIdent gVarTable
-      notFoundError = SemanticError{errorCode=NoSuchIdentEC, errorMessage=[Here.i| Identifier '${name}' is not found|]}
-  -- Get identifier information
-  identInfo <- Either.Utils.maybeToEither notFoundError identInfoMaybe
-  case identInfo of
-    GVarIdentInfo{}      -> fail [Here.i| Identifier '${name}' should be function, but variable|]
-    LVarIdentInfo{}      -> fail [Here.i| Unexpected error: '${name}' should be global function|]
-    FuncIdentInfo{retTy} -> return retTy
-exprToTy gVarTable lVarTables (LetExpr{inExpr})   = exprToTy gVarTable lVarTables inExpr
-
-
 data IdentInfo =
   GVarIdentInfo {ty :: Ty, globalPtrName :: AST.Name} |
   LVarIdentInfo {ty :: Ty, localName :: AST.Name} |
@@ -104,24 +71,9 @@ data ExprCodegenEnv =
  }
  deriving (Show)
 
+type CodegenError = ()
 
--- | Error code
-data ErrorCode =
-  NoSuchIdentEC |
-  UnexpectedEC
-  deriving (Eq, Show)
-
--- | Semantic error
-data SemanticError =
- SemanticError
- { errorCode    :: ErrorCode
- , errorMessage :: String
- }
- deriving (Eq, Show)
-
-
-
-newtype ExprCodegen a = ExprCodegen {runExprCodegen :: StateT ExprCodegenEnv (Either SemanticError) a}
+newtype ExprCodegen a = ExprCodegen {runExprCodegen :: StateT ExprCodegenEnv (Either CodegenError) a}
   deriving (Functor, Applicative, Monad, MonadState ExprCodegenEnv)
 
 -- | Get fresh int count (zero-origin)
@@ -167,11 +119,6 @@ stackInstruction :: Named AST.Instruction -> ExprCodegen ()
 stackInstruction instr = do
   modify (\env@ExprCodegenEnv{stackedInstrs} -> env{stackedInstrs=stackedInstrs++[instr]})
 
--- | Look up local variable tables
-lookupLVarTables :: Ident -> [VarTable] -> Maybe IdentInfo
-lookupLVarTables _     []     = Nothing
-lookupLVarTables ident (v:vs) = Map.lookup ident v <|> lookupLVarTables ident vs
-
 
 -- | Push & Pop a local variable map
 withLVarTable :: Map Ident IdentInfo -> ExprCodegen a -> ExprCodegen a
@@ -184,18 +131,15 @@ withLVarTable lVarMap f = do
   return ret
 
 -- | Expr => Operand
-exprToExprCodegen :: Expr -> ExprCodegen AST.Operand
-exprToExprCodegen (LitExpr lit) = return (litToOperand lit)
-exprToExprCodegen (IdentExpr ident@(Ident name)) = do
+exprToExprCodegen :: Expr Ty -> ExprCodegen AST.Operand
+exprToExprCodegen (LitExpr {lit}) = return (litToOperand lit)
+exprToExprCodegen (IdentExpr {ident=ident@(Ident name)}) = do
   -- Get local variable tables
   lVarTables <- gets localVarTables
   -- Get global variable table
   gVarTable  <- gets globalVarTable
-  -- Find ident from tables
-  let identInfoMaybe = lookupLVarTables ident lVarTables <|> Map.lookup ident gVarTable
-      notFoundError  = SemanticError{errorCode=NoSuchIdentEC, errorMessage=[Here.i| Identifier '${name}' is not found|]}
-  -- Get identifier information
-  indentInfo <- ExprCodegen $ Monad.Trans.lift $ Either.Utils.maybeToEither notFoundError identInfoMaybe
+  -- Find ident from tables (NOTE: Semantic analysis keeps it safe)
+  let Just indentInfo = lookupMaps ident lVarTables <|> Map.lookup ident gVarTable
   case indentInfo of
     GVarIdentInfo{ty, globalPtrName} -> do
       let llvmTy    = tyToLLVMTy ty
@@ -218,7 +162,7 @@ exprToExprCodegen (LetExpr {binds, inExpr}) = do
   prefixNumber <- getFreshCount
 
   -- TODO: Rename better
-  let f :: Map Ident IdentInfo -> Bind -> ExprCodegen (Map Ident IdentInfo)
+  let f :: Map Ident IdentInfo -> Bind Ty -> ExprCodegen (Map Ident IdentInfo)
       f lVarMap (Bind {ident=ident@(Ident name), ty, bodyExpr}) = do
         withLVarTable lVarMap $ do -- NOTE: push & pop (lVarMap)
           -- Eval bodyExpr to operand
@@ -244,11 +188,8 @@ exprToExprCodegen (ApplyExpr {calleeIdent=calleeIdent@(Ident calleeName), argExp
   gVarTable <- gets globalVarTable
   -- Result name
   let resName = AST.Name (strToShort [Here.i|$$apply_res${prefixNumber}|])
-  -- Find ident from tables
-  let varInfoMaybe  = Map.lookup calleeIdent gVarTable
-      notFoundError = SemanticError{errorCode=NoSuchIdentEC, errorMessage=[Here.i| Callee identifier '${calleeName}' not found|]}
-  -- Get identifier information
-  identInfo <- ExprCodegen $ Monad.Trans.lift $ Either.Utils.maybeToEither notFoundError varInfoMaybe
+  -- Get identifier information (NOTE: Semantic analysis keeps it safe)
+  let Just identInfo = Map.lookup calleeIdent gVarTable
   case identInfo of
     FuncIdentInfo{retTy, paramTys, funcName} -> do
       -- Get type
@@ -286,7 +227,7 @@ exprToExprCodegen (ApplyExpr {calleeIdent=calleeIdent@(Ident calleeName), argExp
       return $ AST.LocalReference llvmRetTy resName
     _  -> fail ([Here.i|Should be function identifier |])
 
-exprToExprCodegen (ifexpr@IfExpr {condExpr, thenExpr, elseExpr}) = do
+exprToExprCodegen (ifexpr@IfExpr {anno, condExpr, thenExpr, elseExpr}) = do
   -- Get fresh count for prefix of label
   freshCount <- getFreshCount
   -- Label prefix
@@ -306,7 +247,7 @@ exprToExprCodegen (ifexpr@IfExpr {condExpr, thenExpr, elseExpr}) = do
   -- Get local variable tables
   lVarTables <- gets localVarTables
   -- Get type
-  ty         <- ExprCodegen $ Monad.Trans.lift (exprToTy gVarTable lVarTables ifexpr)
+  let ty     =  anno
   -- Get LLVM type
   let llvmTy = tyToLLVMTy ty
 
@@ -346,8 +287,8 @@ exprToExprCodegen (ifexpr@IfExpr {condExpr, thenExpr, elseExpr}) = do
   return $ AST.LocalReference llvmTy endValueName
 
 
--- | Expr => Operand
-exprToOperandEither :: VarTable -> [VarTable] -> Expr -> Either SemanticError (AST.Operand, ExprCodegenEnv)
+-- | Expr Ty => Operand
+exprToOperandEither :: VarTable -> [VarTable] -> Expr Ty -> Either CodegenError (AST.Operand, ExprCodegenEnv)
 exprToOperandEither globalVarTable localVarTables expr = runStateT (runExprCodegen $ exprToExprCodegen expr) initEnv
   where
     initEnv = ExprCodegenEnv {
@@ -366,7 +307,7 @@ data GdefCodegenEnv =
  }
  deriving (Show)
 
-newtype GdefCodegen a = GdefCodegen {runGdefCodegen :: StateT GdefCodegenEnv (Either SemanticError) a}
+newtype GdefCodegen a = GdefCodegen {runGdefCodegen :: StateT GdefCodegenEnv (Either CodegenError) a}
   deriving (Functor, Applicative, Monad, MonadState GdefCodegenEnv)
 
 
@@ -395,7 +336,7 @@ genParamName :: Ident -> AST.Name
 genParamName (Ident name) = AST.Name (strToShort [Here.i|$$param/${name}|])
 
 -- Gdef => GdefCodegen
-gdefToGdefCodegen :: VarTable -> Gdef -> GdefCodegen ()
+gdefToGdefCodegen :: VarTable -> Gdef Ty -> GdefCodegen ()
 gdefToGdefCodegen globalVarTable (LetGdef (Bind {ident=ident@(Ident name), ty, bodyExpr})) = do
   let globalName   = genGlobalVarName ident
       initFuncName = AST.Name (strToShort [Here.i|$$PLATY_INIT/${name}|])
@@ -404,7 +345,6 @@ gdefToGdefCodegen globalVarTable (LetGdef (Bind {ident=ident@(Ident name), ty, b
   let globalDef = [Quote.LLVM.lldef| $gid:globalName = global $type:llvmTy undef |]
   -- Add the definition
   addDefinition globalDef
-  -- Evaluate bodyExpr
   let operandEither = exprToOperandEither globalVarTable [] bodyExpr
   -- Get operand and env
   (bodyOperand, ExprCodegenEnv{basicBlocks, stackedInstrs, stackedLabels=[lastLabel]}) <- GdefCodegen (Monad.Trans.lift operandEither)
@@ -454,6 +394,7 @@ gdefToGdefCodegen globalVarTable (LetGdef (Bind {ident=ident@(Ident name), ty, b
   -- Add a global variable getter
   addDefinition getterFuncDef
   return ()
+
 gdefToGdefCodegen globalVarTable (FuncGdef {ident=ident@(Ident name), params, retTy, bodyExpr}) = do
   -- Variable of parameters
   let paramVarTable = Map.fromList [(ident, LVarIdentInfo{ty=ty, localName=genParamName ident}) | Param{ident, ty} <- params]
@@ -510,8 +451,8 @@ gdefToGdefCodegen globalVarTable (FuncGdef {ident=ident@(Ident name), params, re
   return ()
 
 
--- | Program => AST.Module
-programToModule :: Program -> Either SemanticError AST.Module
+-- | Program Ty => AST.Module
+programToModule :: Program Ty -> Either CodegenError AST.Module
 programToModule Program{gdefs} = do
   let initEnv = GdefCodegenEnv {
                   definitions         = []

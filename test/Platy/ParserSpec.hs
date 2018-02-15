@@ -27,47 +27,50 @@ spec :: Spec
 spec = do
   describe "Parse Expression Test" $ do
     it "23 - Int literal" $ do
-      let expect = Right $ LitExpr $ IntLit 23
+      let expect = Right $ LitExpr {anno=(), lit=IntLit 23}
       Parsec.parse exprP "" "23" `shouldBe` expect
 
     it "'k' - Char literal" $ do
-      let expect = Right $ LitExpr $ CharLit 'k'
+      let expect = Right $ LitExpr {anno=(), lit=CharLit 'k'}
       Parsec.parse exprP "" "'k'" `shouldBe` expect
 
     it "'myVar' - Identifier" $ do
-      let expect = Right $ IdentExpr $ Ident "myVar"
+      let expect = Right $ IdentExpr {anno=(), ident=Ident "myVar"}
       Parsec.parse exprP "" "myVar" `shouldBe` expect
 
     it "(myfunc [78]) - Apply" $ do
       let expect = Right $ ApplyExpr
-                           { calleeIdent = (Ident "myfunc")
-                           , argExprs = [LitExpr (IntLit 78)]
+                           { anno =()
+                           , calleeIdent = (Ident "myfunc")
+                           , argExprs = [LitExpr {anno=(), lit=IntLit 78}]
                            }
       Parsec.parse exprP "" "(myfunc [78])" `shouldBe` expect
 
     it "(@if True 5544 2299)" $ do
       let expect = Right $ IfExpr
-                           { condExpr = LitExpr $ BoolLit True
-                           , thenExpr = LitExpr $ IntLit 5544
-                           , elseExpr = LitExpr $ IntLit 2299
+                           { anno = ()
+                           , condExpr = LitExpr {anno=(), lit=BoolLit True}
+                           , thenExpr = LitExpr {anno=(), lit=IntLit 5544}
+                           , elseExpr = LitExpr {anno=(), lit=IntLit 2299}
                            }
       Parsec.parse exprP "" "(@if True 5544 2299)" `shouldBe` expect
 
     it "let-expression" $ do
       let expect = Right $ LetExpr
-                           { binds =
+                           { anno = ()
+                           , binds =
                              [ Bind
                                { ident = Ident "a"
                                , ty = IntTy
-                               , bodyExpr = LitExpr $ IntLit 2233
+                               , bodyExpr = LitExpr {anno=(), lit=IntLit 2233}
                                }
                              , Bind
                                { ident = Ident "b"
                                , ty = CharTy
-                               , bodyExpr = LitExpr $ CharLit 'f'
+                               , bodyExpr = LitExpr {anno=(), lit=CharLit 'f'}
                                }
                              ]
-                           , inExpr = IdentExpr $ Ident "a"
+                           , inExpr = IdentExpr{anno=(), ident=Ident "a"}
                            }
       Parsec.parse exprP "" "(@let [(= a Int 2233), (= b Char 'f')] a)" `shouldBe` expect
 
@@ -79,7 +82,7 @@ spec = do
                              Bind
                              { ident = Ident "myGlobal"
                              , ty = IntTy
-                             , bodyExpr = LitExpr $ IntLit 445544
+                             , bodyExpr = LitExpr{anno=(), lit=IntLit 445544}
                              }
                            }
       Parsec.parse gdefP "" "(@global-let myGlobal Int 445544)" `shouldBe` expect
@@ -89,7 +92,7 @@ spec = do
                             { ident = Ident "myfunc"
                             , params = [Param {ident=Ident "a", ty=IntTy}, Param {ident=Ident "b", ty=CharTy}]
                             , retTy = IntTy
-                            , bodyExpr = IdentExpr $ Ident "a"
+                            , bodyExpr = IdentExpr{anno=(), ident=Ident "a"}
                             }
       Parsec.parse gdefP "" "(@func myfunc [(:: a Int), (:: b Char)] Int a)" `shouldBe` expect
 
@@ -108,7 +111,7 @@ spec = do
                                   Bind
                                   { ident = Ident "a"
                                   , ty = IntTy
-                                  , bodyExpr = LitExpr $ IntLit 8989
+                                  , bodyExpr = LitExpr {anno=(), lit=IntLit 8989}
                                   }
                                 }
                               , LetGdef
@@ -116,7 +119,7 @@ spec = do
                                   Bind
                                   { ident = Ident "b"
                                   , ty = IntTy
-                                  , bodyExpr = LitExpr $ IntLit 12121
+                                  , bodyExpr = LitExpr {anno=(), lit=IntLit 12121}
                                   }
                                 }
                               ]
@@ -139,7 +142,7 @@ spec = do
                                   Bind
                                   { ident = Ident "a"
                                   , ty = IntTy
-                                  , bodyExpr = LitExpr $ IntLit 8989
+                                  , bodyExpr = LitExpr {anno=(), lit=IntLit 8989}
                                   }
                                 }
                               , LetGdef
@@ -147,7 +150,7 @@ spec = do
                                   Bind
                                   { ident = Ident "b"
                                   , ty = IntTy
-                                  , bodyExpr = LitExpr $ IntLit 12121
+                                  , bodyExpr = LitExpr {anno=(), lit=IntLit 12121}
                                   }
                                 }
                               ]

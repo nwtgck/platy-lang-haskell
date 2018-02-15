@@ -1,0 +1,10 @@
+(@global-let a Char
+    (@if True
+        10
+        'j'
+    )
+)
+
+(@func main [] Unit
+    Unit
+)

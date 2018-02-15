@@ -1,0 +1,7 @@
+(@func myfunc [(:: p Int), (:: q Char)] Int
+    p
+)
+
+(@func main [] Unit
+    (print-int [(myfunc [True, 'a'])])
+)
