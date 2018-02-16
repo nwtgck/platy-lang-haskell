@@ -340,8 +340,8 @@ gdefToGdefCodegen globalVarTable (LetGdef (Bind {ident=ident@(Ident name), ty, b
               lastLabel
               -- NOTE: stackedInstrs added
               (stackedInstrs ++ [
-                AST.Name "PLATY_GLOBAL_RES" := [Quote.LLVM.lli| $opr:bodyOperand |],
-                AST.Do [Quote.LLVM.lli| store $type:llvmTy %PLATY_GLOBAL_RES, $type:llvmPtrTy $gid:globalName |]
+                globalResName := [Quote.LLVM.lli| $opr:bodyOperand |],
+                AST.Do [Quote.LLVM.lli| store $type:llvmTy $id:globalResName, $type:llvmPtrTy $gid:globalName |]
               ])
               (AST.Do [Quote.LLVM.llt| ret void |])
 
@@ -390,9 +390,9 @@ gdefToGdefCodegen globalVarTable (FuncGdef {ident=ident@(Ident name), params, re
               lastLabel
               -- NOTE: stackedInstrs added
               (stackedInstrs ++ [
-                AST.Name "PLATY_GLOBAL_RES" := [Quote.LLVM.lli| $opr:bodyOperand |]
+                globalResName := [Quote.LLVM.lli| $opr:bodyOperand |]
               ])
-              (AST.Do [Quote.LLVM.llt| ret $type:llvmRetTy %PLATY_GLOBAL_RES |])
+              (AST.Do [Quote.LLVM.llt| ret $type:llvmRetTy $id:globalResName |])
 
   -- (This comment is for the future fundDef)
 --         [Quote.LLVM.lldef|

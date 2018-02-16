@@ -27,5 +27,8 @@ globalInitFuncName = AST.Name "PLATY_GLOBALS_INIT"
 langEntrypointFuncName :: AST.Name
 langEntrypointFuncName = AST.Name "$$PLATY_MAIN"
 
+globalResName :: AST.Name
+globalResName = AST.Name "$$PLATY/GLOBAL_RES"
+
 entrypointFuncIdent :: Ident
 entrypointFuncIdent = Ident "main"
