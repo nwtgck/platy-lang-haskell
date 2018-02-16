@@ -141,8 +141,6 @@ exprToTypedExpr ApplyExpr{calleeIdent=calleeIdent@(Ident name), argExprs} = do
         else
           SemanticCheck $ Monad.Trans.lift $ Left SemanticError{errorCode=ArgsNumMismatchEC, errorMessage=[Here.i| The number of arguments should be ${length paramTys}, but ${length typedArgExprs}|]}
 exprToTypedExpr LetExpr{binds, inExpr} = do
-  -- TODO: <find duplicated identifier in parameters> in bind
-
   -- TODO: Rename better
   let f :: (Map Ident IdentInfo, [Bind Ty]) -> Bind () -> SemanticCheck (Map Ident IdentInfo, [Bind Ty])
       f (lVarMap, typedBinds) (Bind {ident=ident@(Ident name), ty, bodyExpr}) = do

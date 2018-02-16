@@ -10,6 +10,8 @@ module Main where
 import qualified Data.String.Here as Here
 import Control.Monad (mapM_)
 import qualified Options.Applicative as OptApplicative
+import qualified System.Exit as Exit
+import qualified System.IO as IO
 import qualified System.IO.Temp as Temp
 import qualified System.Process as Process
 import qualified Data.ByteString as ByteString
@@ -130,13 +132,12 @@ main = do
     Left compileError -> do
       let errorPrint :: CompileError -> IO ()
           errorPrint
-            =  (\(parseError    :: Parsec.ParseError) -> print parseError)
-            @> (\(semanticError :: SemanticError)     -> print semanticError)
-            @> (\(codegenError  :: CodegenError)      -> print codegenError)
+            =  (\(parseError    :: Parsec.ParseError) -> IO.hPrint IO.stderr parseError)
+            @> (\(semanticError :: SemanticError)     -> IO.hPrint IO.stderr semanticError)
+            @> (\(codegenError  :: CodegenError)      -> IO.hPrint IO.stderr codegenError)
             @> OpenUnion.typesExhausted
       errorPrint compileError
-      -- TODO: Print to stdrr
-      -- TODO: Exit with error
+      Exit.exitWith (Exit.ExitFailure 1)
 
 
 
