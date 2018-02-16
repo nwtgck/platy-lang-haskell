@@ -105,8 +105,9 @@ litP :: Parsec String u Lit
 litP = intLitP <|> boolLitP <|> charLitP <|> unitLitP
   where
     intLitP = do
+      sign   <- Parsec.option 1 (Parsec.char '-' *> return (-1))
       intStr <- Parsec.many1 (ParsecChar.digit)
-      return (IntLit (read intStr))
+      return (IntLit (sign * read intStr))
 
     boolLitP = trueLitP <|> falseLitP
       where
