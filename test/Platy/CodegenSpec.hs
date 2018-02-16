@@ -146,15 +146,18 @@ spec = do
                   , retTy = UnitTy
                   , bodyExpr =
                     IfExpr
-                    {condExpr = LitExpr {anno=(), lit=BoolLit True}
+                    { anno=()
+                    , condExpr = LitExpr {anno=(), lit=BoolLit True}
                     , thenExpr =
                       ApplyExpr
-                      { calleeIdent = Ident "print-int"
+                      { anno=()
+                      , calleeIdent = Ident "print-int"
                       , argExprs = [LitExpr {anno=(), lit=IntLit 339911}]
                       }
                     , elseExpr =
                       ApplyExpr
-                      { calleeIdent = Ident "print-int"
+                      { anno=()
+                      , calleeIdent = Ident "print-int"
                       , argExprs = [LitExpr {anno=(), lit=IntLit 220022}]
                       }
                     }
@@ -185,7 +188,8 @@ spec = do
                     , retTy = UnitTy
                     , bodyExpr =
                       ApplyExpr
-                      { calleeIdent = Ident "print-int"
+                      { anno=()
+                      , calleeIdent = Ident "print-int"
                       , argExprs =
                         [ IdentExpr {anno=(), ident=Ident "gval1"}
                         ]
@@ -213,7 +217,8 @@ spec = do
                   , retTy = UnitTy
                   , bodyExpr =
                     LetExpr
-                    { binds =
+                    { anno=()
+                    , binds =
                       [ Bind
                         { ident = Ident "a"
                         , ty = IntTy
@@ -229,7 +234,8 @@ spec = do
                         , ty = UnitTy
                         , bodyExpr =
                           ApplyExpr
-                          { calleeIdent = Ident "print-int"
+                          { anno=()
+                          , calleeIdent = Ident "print-int"
                           , argExprs = [IdentExpr {anno=(), ident=Ident "a"}]
                           }
                         }
@@ -238,7 +244,8 @@ spec = do
                         , ty = UnitTy
                         , bodyExpr =
                           ApplyExpr
-                          { calleeIdent = Ident "print-int"
+                          { anno=()
+                          , calleeIdent = Ident "print-int"
                           , argExprs = [IdentExpr {anno=(), ident=Ident "b"}]
                           }
                         }
@@ -268,14 +275,17 @@ spec = do
                     , retTy = UnitTy
                     , bodyExpr =
                       ApplyExpr
-                      { calleeIdent = Ident "print-int"
+                      { anno=()
+                      , calleeIdent = Ident "print-int"
                       , argExprs =
                         [ IfExpr
-                          { condExpr = LitExpr {anno=(), lit=BoolLit False}
+                          { anno=()
+                          , condExpr = LitExpr {anno=(), lit=BoolLit False}
                           , thenExpr = LitExpr {anno=(), lit=IntLit 2299}
                           , elseExpr =
                             IfExpr
-                            { condExpr = LitExpr {anno=(), lit=BoolLit True}
+                            { anno=()
+                            , condExpr = LitExpr {anno=(), lit=BoolLit True}
                             , thenExpr = LitExpr {anno=(), lit=IntLit 6633}
                             , elseExpr = LitExpr {anno=(), lit=IntLit 9900}
                             }
@@ -309,7 +319,8 @@ spec = do
                   , retTy = UnitTy
                   , bodyExpr =
                     LetExpr
-                    { binds =
+                    { anno=()
+                    , binds =
                       [ Bind
                         { ident = Ident "a"
                         , ty = IntTy
@@ -320,7 +331,8 @@ spec = do
                         , ty = IntTy
                         , bodyExpr =
                           LetExpr
-                          { binds =
+                          { anno=()
+                          , binds =
                             [ Bind
                               { ident = Ident "c"
                               , ty = IntTy
@@ -340,7 +352,8 @@ spec = do
                         , ty = UnitTy
                         , bodyExpr =
                           ApplyExpr
-                          { calleeIdent = Ident "print-int"
+                          { anno=()
+                          , calleeIdent = Ident "print-int"
                           , argExprs = [IdentExpr {anno=(), ident=Ident "a"}]
                           }
                         }
@@ -349,7 +362,8 @@ spec = do
                         , ty = UnitTy
                         , bodyExpr =
                           ApplyExpr
-                          { calleeIdent = Ident "print-int"
+                          { anno=()
+                          , calleeIdent = Ident "print-int"
                           , argExprs = [IdentExpr {anno=(), ident=Ident "b"}]
                           }
                         }
@@ -374,7 +388,8 @@ spec = do
                    , retTy = UnitTy
                    , bodyExpr =
                      ApplyExpr
-                     { calleeIdent = Ident "print-int"
+                     { anno=()
+                     , calleeIdent = Ident "print-int"
                      , argExprs = [IdentExpr {anno=(), ident=Ident "b"}]
                      }
                    }
@@ -385,7 +400,8 @@ spec = do
                    , retTy = UnitTy
                    , bodyExpr =
                      ApplyExpr
-                     { calleeIdent = Ident "myfunc"
+                     { anno=()
+                     , calleeIdent = Ident "myfunc"
                      , argExprs = [LitExpr {anno=(), lit=IntLit 449999}, LitExpr {anno=(), lit=IntLit 3300}]
                      }
                    }

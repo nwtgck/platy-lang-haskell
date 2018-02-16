@@ -24,6 +24,8 @@ dependencies:
 
 library:
   source-dirs: src
+  ghc-options:
+   - -Werror=missing-fields
   dependencies:
    - mtl
    - containers
@@ -45,6 +47,7 @@ executables:
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
+    - -Werror=missing-fields
     dependencies:
      - platy-lang
      - containers
@@ -70,6 +73,7 @@ tests:
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
+    - -Werror=missing-fields
     dependencies:
      - platy-lang
      - hspec
