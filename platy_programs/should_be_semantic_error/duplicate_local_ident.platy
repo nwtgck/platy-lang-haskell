@@ -1,0 +1,10 @@
+(@global-let a Unit
+    (@let [
+        (= a Char 'b'),
+        (= a Char 'n')
+    ] Unit)
+)
+
+(@func main [] Unit
+    Unit
+)

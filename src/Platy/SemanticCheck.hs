@@ -159,13 +159,19 @@ exprToTypedExpr LetExpr{binds, inExpr} = do
             else
               SemanticCheck $ Monad.Trans.lift $ Left SemanticError{errorCode=TypeMismatchEC, errorMessage=[Here.i| Type of the expresson should be '${ty}' but found '${actualBodyTy}'|]}
 
-  -- Define all binds
-  (localVariableMap, typedBinds) <- Foldable.foldlM f (Map.empty :: Map Ident IdentInfo, [] :: [Bind Ty]) binds
-  -- Get typedInExpr
-  typedInExpr <- withLVarTable localVariableMap $ do -- NOTE: push & pop (localVariableMap)
-    -- Type inExpr
-    exprToTypedExpr inExpr
-  return LetExpr{anno=anno typedInExpr, binds=typedBinds, inExpr=typedInExpr}
+  -- Find duplicate identifier
+  let dupIdentMay = Utils.findDuplicate [ident | Bind{ident} <- binds]
+  case dupIdentMay of
+    Just dupIdent ->
+      SemanticCheck $ Monad.Trans.lift $ Left SemanticError{errorCode=DuplicateIdentEC, errorMessage=[Here.i|Duplicate identifier '${dupIdent}'|]}
+    Nothing -> do
+      -- Define all binds
+      (localVariableMap, typedBinds) <- Foldable.foldlM f (Map.empty :: Map Ident IdentInfo, [] :: [Bind Ty]) binds
+      -- Get typedInExpr
+      typedInExpr <- withLVarTable localVariableMap $ do -- NOTE: push & pop (localVariableMap)
+        -- Type inExpr
+        exprToTypedExpr inExpr
+      return LetExpr{anno=anno typedInExpr, binds=typedBinds, inExpr=typedInExpr}
 
 -- | Gdef () => Gdef Ty
 gdefToTypedGdef :: VarTable -> Gdef () -> Either SemanticError (Gdef Ty)

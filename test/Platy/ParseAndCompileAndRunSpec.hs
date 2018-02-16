@@ -70,6 +70,7 @@ spec = do
                           , "apply_arg_type_mismatch"
                           , "duplicate_global_ident"
                           , "duplicate_func_param"
+                          , "duplicate_local_ident"
                           ] -- NOTE: All you have to do is adding here
     let platyExtension  = "platy"
     let expectExtension = "error_code.expect"
