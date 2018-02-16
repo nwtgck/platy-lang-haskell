@@ -29,6 +29,7 @@ data ErrorCode =
     NoSuchIdentEC
   | TypeMismatchEC
   | ArgsNumMismatchEC
+  | DuplicateIdentEC
   | UnexpectedEC
   deriving (Eq, Show)
 
@@ -140,6 +141,8 @@ exprToTypedExpr ApplyExpr{calleeIdent=calleeIdent@(Ident name), argExprs} = do
         else
           SemanticCheck $ Monad.Trans.lift $ Left SemanticError{errorCode=ArgsNumMismatchEC, errorMessage=[Here.i| The number of arguments should be ${length paramTys}, but ${length typedArgExprs}|]}
 exprToTypedExpr LetExpr{binds, inExpr} = do
+  -- TODO: <find duplicated identifier in parameters> in bind
+
   -- TODO: Rename better
   let f :: (Map Ident IdentInfo, [Bind Ty]) -> Bind () -> SemanticCheck (Map Ident IdentInfo, [Bind Ty])
       f (lVarMap, typedBinds) (Bind {ident=ident@(Ident name), ty, bodyExpr}) = do
@@ -180,6 +183,7 @@ gdefToTypedGdef globalVarTable gdef =
           Left SemanticError{errorCode=TypeMismatchEC, errorMessage=[Here.i| Type of the expresson should be '${ty}' but found '${actualBodyTy}'|]}
     FuncGdef {ident, params, retTy, bodyExpr} -> do
       -- Variable of parameters
+      -- TODO: <find duplicated identifier in parameters>
       let paramVarTable = Map.fromList [(ident, LVarIdentInfo{ty=ty}) | Param{ident, ty} <- params]
       let initEnv = SemanticCheckEnv {globalVarTable, localVarTables=[paramVarTable]}
       typedBodyExpr <- evalStateT (runSemanticCheck $ exprToTypedExpr bodyExpr) initEnv
@@ -196,15 +200,25 @@ programToTypedProgram :: Program () -> Either SemanticError (Program Ty)
 programToTypedProgram Program{gdefs} = do
   let f LetGdef {bind=Bind {ident, ty}} = (ident, GVarIdentInfo {ty=ty})
       f FuncGdef {ident, retTy, params} = (ident, FuncIdentInfo {retTy=retTy, paramTys=[ty | Param {ty} <- params]})
-      -- TODO: <Find duplicated identifiers>
-      globalVarMap = Map.fromList (fmap f gdefs)
 
-      stdVarMap = Map.map (\FuncNativeGdef {retTy,paramTys,funcLLVMName} ->
-                                 FuncIdentInfo
-                                 { retTy
-                                 , paramTys
-                                 })
-                             stdlibNativeGdefMap
-  --Type gdefs
-  typedGdefs <- mapM (gdefToTypedGdef (Map.union globalVarMap stdVarMap)) gdefs
-  return Program{gdefs=typedGdefs}
+      identAndGdefs =  fmap f gdefs
+      -- Find duplicate identifier
+      dupIdentMay   = Utils.findDuplicate (fmap fst identAndGdefs)
+
+  case dupIdentMay of
+    Just dupIdent -> do
+      Left SemanticError{errorCode=DuplicateIdentEC, errorMessage=[Here.i| Identifier '${dupIdent}' is duplicate in global definition|]}
+    Nothing -> do
+      let globalVarMap = Map.fromList identAndGdefs
+
+
+
+          stdVarMap = Map.map (\FuncNativeGdef {retTy,paramTys,funcLLVMName} ->
+                                     FuncIdentInfo
+                                     { retTy
+                                     , paramTys
+                                     })
+                                 stdlibNativeGdefMap
+      --Type gdefs
+      typedGdefs <- mapM (gdefToTypedGdef (Map.union globalVarMap stdVarMap)) gdefs
+      return Program{gdefs=typedGdefs}
