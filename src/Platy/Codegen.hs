@@ -361,18 +361,6 @@ gdefToGdefCodegen globalVarTable (LetGdef (Bind {ident=ident@(Ident name), ty, b
   -- Add the init-function
   addInitFunc funcDef
 
-  -- Definition of $$global_getter
-  let getterFuncName = AST.Name (strToShort [Here.i|$$global_getter/${name}|])
-      getterFuncDef = [Quote.LLVM.lldef|
-        define $type:llvmTy $gid:getterFuncName(){
-        entry:
-          %res = load $type:llvmPtrTy $gid:globalName
-          ret $type:llvmTy %res
-        }
-      |]
-
-  -- Add a global variable getter
-  addDefinition getterFuncDef
   return ()
 
 gdefToGdefCodegen globalVarTable (FuncGdef {ident=ident@(Ident name), params, retTy, bodyExpr}) = do
