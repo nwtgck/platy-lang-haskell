@@ -60,7 +60,18 @@ spec = do
 
   describe "[should semantic error] Parse & Compile & Run" $ do
     let fileDir         = FilePath.Posix.joinPath ["platy_programs", "should_be_semantic_error"]
-    let programNames    = ["no_such_ident", "no_such_ident_callee", "global_type_mismatch", "local_type_mismatch", "if_cond_type_mismatch", "if_then_type_mismatch", "func_body_type_mismatch", "apply_arg_type_mismatch"] -- NOTE: All you have to do is adding here
+    let programNames    = [ "no_such_ident"
+                          , "no_such_ident_callee"
+                          , "global_type_mismatch"
+                          , "local_type_mismatch"
+                          , "if_cond_type_mismatch"
+                          , "if_then_type_mismatch"
+                          , "func_body_type_mismatch"
+                          , "apply_arg_type_mismatch"
+                          , "duplicate_global_ident"
+                          , "duplicate_func_param"
+                          , "duplicate_local_ident"
+                          ] -- NOTE: All you have to do is adding here
     let platyExtension  = "platy"
     let expectExtension = "error_code.expect"
 

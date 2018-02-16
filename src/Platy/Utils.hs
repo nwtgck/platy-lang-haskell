@@ -11,6 +11,14 @@ import qualified LLVM.Module as Module
 import qualified LLVM.Context as Context
 import qualified LLVM.Target as Target
 
+
+-- | Find duplicate element
+findDuplicate :: Eq a => [a] -> Maybe a
+findDuplicate []     = Nothing
+findDuplicate (x:xs) = if x `elem` xs
+                         then Just x
+                         else findDuplicate xs
+
 -- (for preventing "\22" in [Here.i])
 strToShort :: String -> ShortByteString
 strToShort = (toShort . BS.pack)

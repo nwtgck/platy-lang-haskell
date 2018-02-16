@@ -1,0 +1,6 @@
+(@global-let a Int 55)
+(@global-let a Int 23)
+
+(@func main [] Unit
+    Unit
+)

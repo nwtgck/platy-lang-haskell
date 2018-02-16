@@ -1,0 +1,5 @@
+(@func myfunc [(:: p Int), (:: p Bool)] Int 23)
+
+(@func main [] Unit
+    Unit
+)

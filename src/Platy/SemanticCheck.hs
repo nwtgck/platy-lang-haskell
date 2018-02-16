@@ -29,6 +29,7 @@ data ErrorCode =
     NoSuchIdentEC
   | TypeMismatchEC
   | ArgsNumMismatchEC
+  | DuplicateIdentEC
   | UnexpectedEC
   deriving (Eq, Show)
 
@@ -140,6 +141,8 @@ exprToTypedExpr ApplyExpr{calleeIdent=calleeIdent@(Ident name), argExprs} = do
         else
           SemanticCheck $ Monad.Trans.lift $ Left SemanticError{errorCode=ArgsNumMismatchEC, errorMessage=[Here.i| The number of arguments should be ${length paramTys}, but ${length typedArgExprs}|]}
 exprToTypedExpr LetExpr{binds, inExpr} = do
+  -- TODO: <find duplicated identifier in parameters> in bind
+
   -- TODO: Rename better
   let f :: (Map Ident IdentInfo, [Bind Ty]) -> Bind () -> SemanticCheck (Map Ident IdentInfo, [Bind Ty])
       f (lVarMap, typedBinds) (Bind {ident=ident@(Ident name), ty, bodyExpr}) = do
@@ -156,13 +159,19 @@ exprToTypedExpr LetExpr{binds, inExpr} = do
             else
               SemanticCheck $ Monad.Trans.lift $ Left SemanticError{errorCode=TypeMismatchEC, errorMessage=[Here.i| Type of the expresson should be '${ty}' but found '${actualBodyTy}'|]}
 
-  -- Define all binds
-  (localVariableMap, typedBinds) <- Foldable.foldlM f (Map.empty :: Map Ident IdentInfo, [] :: [Bind Ty]) binds
-  -- Get typedInExpr
-  typedInExpr <- withLVarTable localVariableMap $ do -- NOTE: push & pop (localVariableMap)
-    -- Type inExpr
-    exprToTypedExpr inExpr
-  return LetExpr{anno=anno typedInExpr, binds=typedBinds, inExpr=typedInExpr}
+  -- Find duplicate identifier
+  let dupIdentMay = Utils.findDuplicate [ident | Bind{ident} <- binds]
+  case dupIdentMay of
+    Just dupIdent ->
+      SemanticCheck $ Monad.Trans.lift $ Left SemanticError{errorCode=DuplicateIdentEC, errorMessage=[Here.i|Duplicate identifier '${dupIdent}'|]}
+    Nothing -> do
+      -- Define all binds
+      (localVariableMap, typedBinds) <- Foldable.foldlM f (Map.empty :: Map Ident IdentInfo, [] :: [Bind Ty]) binds
+      -- Get typedInExpr
+      typedInExpr <- withLVarTable localVariableMap $ do -- NOTE: push & pop (localVariableMap)
+        -- Type inExpr
+        exprToTypedExpr inExpr
+      return LetExpr{anno=anno typedInExpr, binds=typedBinds, inExpr=typedInExpr}
 
 -- | Gdef () => Gdef Ty
 gdefToTypedGdef :: VarTable -> Gdef () -> Either SemanticError (Gdef Ty)
@@ -179,32 +188,49 @@ gdefToTypedGdef globalVarTable gdef =
         else
           Left SemanticError{errorCode=TypeMismatchEC, errorMessage=[Here.i| Type of the expresson should be '${ty}' but found '${actualBodyTy}'|]}
     FuncGdef {ident, params, retTy, bodyExpr} -> do
-      -- Variable of parameters
-      let paramVarTable = Map.fromList [(ident, LVarIdentInfo{ty=ty}) | Param{ident, ty} <- params]
-      let initEnv = SemanticCheckEnv {globalVarTable, localVarTables=[paramVarTable]}
-      typedBodyExpr <- evalStateT (runSemanticCheck $ exprToTypedExpr bodyExpr) initEnv
-      let actualBodyTy :: Ty
-          actualBodyTy  = anno typedBodyExpr
-      if retTy == actualBodyTy
-       then
-         return FuncGdef {ident, params, retTy, bodyExpr=typedBodyExpr}
-       else
-         Left SemanticError{errorCode=TypeMismatchEC, errorMessage=[Here.i| Return-type of the function body should be '${retTy}' but found '${actualBodyTy}'|]}
+      let identAndIdentInfos = [(ident, LVarIdentInfo{ty=ty}) | Param{ident, ty} <- params]
+      -- Find duplicate parameter identifier
+      let dupIdentMay        = Utils.findDuplicate (fmap fst identAndIdentInfos)
+      case dupIdentMay of
+        Just dupIdent ->
+          Left SemanticError{errorCode=DuplicateIdentEC, errorMessage=[Here.i| Identifier '${dupIdent}' is duplicate in parameters in function '${ident}' |]}
+        Nothing -> do
+          -- Variable of parameters
+          let paramVarTable = Map.fromList identAndIdentInfos
+          let initEnv = SemanticCheckEnv {globalVarTable, localVarTables=[paramVarTable]}
+          typedBodyExpr <- evalStateT (runSemanticCheck $ exprToTypedExpr bodyExpr) initEnv
+          let actualBodyTy :: Ty
+              actualBodyTy  = anno typedBodyExpr
+          if retTy == actualBodyTy
+           then
+             return FuncGdef {ident, params, retTy, bodyExpr=typedBodyExpr}
+           else
+             Left SemanticError{errorCode=TypeMismatchEC, errorMessage=[Here.i| Return-type of the function body should be '${retTy}' but found '${actualBodyTy}'|]}
 
 -- | Program () => Program Ty
 programToTypedProgram :: Program () -> Either SemanticError (Program Ty)
 programToTypedProgram Program{gdefs} = do
   let f LetGdef {bind=Bind {ident, ty}} = (ident, GVarIdentInfo {ty=ty})
       f FuncGdef {ident, retTy, params} = (ident, FuncIdentInfo {retTy=retTy, paramTys=[ty | Param {ty} <- params]})
-      -- TODO: <Find duplicated identifiers>
-      globalVarMap = Map.fromList (fmap f gdefs)
 
-      stdVarMap = Map.map (\FuncNativeGdef {retTy,paramTys,funcLLVMName} ->
-                                 FuncIdentInfo
-                                 { retTy
-                                 , paramTys
-                                 })
-                             stdlibNativeGdefMap
-  --Type gdefs
-  typedGdefs <- mapM (gdefToTypedGdef (Map.union globalVarMap stdVarMap)) gdefs
-  return Program{gdefs=typedGdefs}
+      identAndGdefs =  fmap f gdefs
+      -- Find duplicate identifier
+      dupIdentMay   = Utils.findDuplicate (fmap fst identAndGdefs)
+
+  case dupIdentMay of
+    Just dupIdent -> do
+      Left SemanticError{errorCode=DuplicateIdentEC, errorMessage=[Here.i| Identifier '${dupIdent}' is duplicate in global definition|]}
+    Nothing -> do
+      let globalVarMap = Map.fromList identAndGdefs
+
+
+
+          stdVarMap = Map.map (\FuncNativeGdef {retTy,paramTys,funcLLVMName} ->
+                                     FuncIdentInfo
+                                     { retTy
+                                     , paramTys
+                                     })
+                                 stdlibNativeGdefMap
+      --Type gdefs
+      typedGdefs <- mapM (gdefToTypedGdef (Map.union globalVarMap stdVarMap)) gdefs
+      return Program{gdefs=typedGdefs}
