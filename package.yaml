@@ -26,6 +26,7 @@ library:
   source-dirs: src
   ghc-options:
    - -Werror=missing-fields
+   - -Werror=incomplete-patterns
   dependencies:
    - mtl
    - containers
@@ -48,6 +49,7 @@ executables:
     - -rtsopts
     - -with-rtsopts=-N
     - -Werror=missing-fields
+    - -Werror=incomplete-patterns
     dependencies:
      - platy-lang
      - containers
@@ -74,6 +76,7 @@ tests:
     - -rtsopts
     - -with-rtsopts=-N
     - -Werror=missing-fields
+    - -Werror=incomplete-patterns
     dependencies:
      - platy-lang
      - hspec
