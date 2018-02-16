@@ -56,6 +56,8 @@ executables:
      - process
      - parsec
      - filepath
+     - open-union
+     - either
      - llvm-hs
      - llvm-hs-pure
      - llvm-hs-pretty

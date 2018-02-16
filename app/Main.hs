@@ -1,6 +1,8 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Main where
 
@@ -16,6 +18,11 @@ import qualified System.FilePath.Posix as FilePath.Posix
 import qualified Control.Monad as Monad
 import qualified Data.Maybe as Maybe
 import Data.Version (showVersion)
+import qualified Data.OpenUnion as OpenUnion
+import Data.OpenUnion ((@>))
+import Data.Either.Combinators (mapLeft)
+
+import qualified LLVM.AST as AST
 
 import Platy.Datatypes
 import Platy.Codegen
@@ -77,56 +84,59 @@ platyOptionsPInfo = OptApplicative.info (OptApplicative.helper <*> versionP <*> 
                    OptApplicative.help "Show version"
                  ])
 
+-- | Compile error
+type CompileError = OpenUnion.Union '[Parsec.ParseError, SemanticError, CodegenError]
+
 main :: IO ()
 main = do
   -- Parse options
   PlatyOptions{platyFilePath, emitLLVM, quiet, outputPathMay} <- OptApplicative.execParser platyOptionsPInfo
   -- Get code string
   platyCode <- readFile platyFilePath
-  -- Parse code
-  let programEither = Parsec.parse programP platyFilePath platyCode
-  case programEither of -- TODO: Reduce dirty nest
-    Right program -> do
-     -- Semantic analysis
-     let typedProgramEither = programToTypedProgram program
-     case typedProgramEither of
-      Right typedProgram -> do
-         -- Generate LLVM module
-         let llvmModuleEither = programToModule typedProgram
-         case llvmModuleEither of
-           Right llvmModule -> do
-            if emitLLVM
-              then do
-                -- Print LLVM IR
-                toLLVM llvmModule
-              else do
-                -- Generate object byte string
-                objBString <- toObjByteString llvmModule
-                -- Create temp directory
-                Temp.withSystemTempDirectory "tempdir" $ \dirpath -> do
-                  -- Create empty obj file
-                  objfilePath <- Temp.emptyTempFile dirpath "objfile"
-                  -- Save obj to a file
-                  ByteString.writeFile objfilePath objBString
-                  -- Create empty executable file
-                  let execfilePath = Maybe.fromMaybe (FilePath.Posix.takeBaseName platyFilePath) outputPathMay
-                   -- Make executable file
-                  Process.system [Here.i|gcc ${objfilePath} -o ${execfilePath}|]
-                  Monad.when (not quiet) $
-                  -- Print generated message
-                    putStrLn [Here.i|Executable '${execfilePath}' generated|]
-                  return ()
+  -- Flow of compile
+  let compileFlowEither :: Either CompileError AST.Module
+      compileFlowEither = do
+        -- Parse code
+        program      <- mapLeft OpenUnion.liftUnion (Parsec.parse programP platyFilePath platyCode)
+        -- Semantic analysis
+        typedProgram <- mapLeft OpenUnion.liftUnion (programToTypedProgram program)
+        -- Generate LLVM module
+        llvmModule   <- mapLeft OpenUnion.liftUnion (programToModule typedProgram)
+        return llvmModule
 
-           Left err -> print err
-           -- TODO: Print to stdrr
-           -- TODO: Exit with error
-      Left err ->
-        print err
-        -- TODO: Print to stdrr
-        -- TODO: Exit with error
-    Left parseErr -> print parseErr
-    -- TODO: Print to stdrr
-    -- TODO: Exit with error
+  case compileFlowEither of
+    Right llvmModule -> do
+      if emitLLVM
+        then do
+          -- Print LLVM IR
+          toLLVM llvmModule
+        else do
+          -- Generate object byte string
+          objBString <- toObjByteString llvmModule
+          -- Create temp directory
+          Temp.withSystemTempDirectory "tempdir" $ \dirpath -> do
+            -- Create empty obj file
+            objfilePath <- Temp.emptyTempFile dirpath "objfile"
+            -- Save obj to a file
+            ByteString.writeFile objfilePath objBString
+            -- Create empty executable file
+            let execfilePath = Maybe.fromMaybe (FilePath.Posix.takeBaseName platyFilePath) outputPathMay
+             -- Make executable file
+            Process.system [Here.i|gcc ${objfilePath} -o ${execfilePath}|]
+            Monad.when (not quiet) $
+            -- Print generated message
+              putStrLn [Here.i|Executable '${execfilePath}' generated|]
+            return ()
+    Left compileError -> do
+      let errorPrint :: CompileError -> IO ()
+          errorPrint
+            =  (\(parseError    :: Parsec.ParseError) -> print parseError)
+            @> (\(semanticError :: SemanticError)     -> print semanticError)
+            @> (\(codegenError  :: CodegenError)      -> print codegenError)
+            @> OpenUnion.typesExhausted
+      errorPrint compileError
+      -- TODO: Print to stdrr
+      -- TODO: Exit with error
 
 
 
