@@ -182,18 +182,24 @@ gdefToTypedGdef globalVarTable gdef =
         else
           Left SemanticError{errorCode=TypeMismatchEC, errorMessage=[Here.i| Type of the expresson should be '${ty}' but found '${actualBodyTy}'|]}
     FuncGdef {ident, params, retTy, bodyExpr} -> do
-      -- Variable of parameters
-      -- TODO: <find duplicated identifier in parameters>
-      let paramVarTable = Map.fromList [(ident, LVarIdentInfo{ty=ty}) | Param{ident, ty} <- params]
-      let initEnv = SemanticCheckEnv {globalVarTable, localVarTables=[paramVarTable]}
-      typedBodyExpr <- evalStateT (runSemanticCheck $ exprToTypedExpr bodyExpr) initEnv
-      let actualBodyTy :: Ty
-          actualBodyTy  = anno typedBodyExpr
-      if retTy == actualBodyTy
-       then
-         return FuncGdef {ident, params, retTy, bodyExpr=typedBodyExpr}
-       else
-         Left SemanticError{errorCode=TypeMismatchEC, errorMessage=[Here.i| Return-type of the function body should be '${retTy}' but found '${actualBodyTy}'|]}
+      let identAndIdentInfos = [(ident, LVarIdentInfo{ty=ty}) | Param{ident, ty} <- params]
+      -- Find duplicate parameter identifier
+      let dupIdentMay        = Utils.findDuplicate (fmap fst identAndIdentInfos)
+      case dupIdentMay of
+        Just dupIdent ->
+          Left SemanticError{errorCode=DuplicateIdentEC, errorMessage=[Here.i| Identifier '${dupIdent}' is duplicate in parameters in function '${ident}' |]}
+        Nothing -> do
+          -- Variable of parameters
+          let paramVarTable = Map.fromList identAndIdentInfos
+          let initEnv = SemanticCheckEnv {globalVarTable, localVarTables=[paramVarTable]}
+          typedBodyExpr <- evalStateT (runSemanticCheck $ exprToTypedExpr bodyExpr) initEnv
+          let actualBodyTy :: Ty
+              actualBodyTy  = anno typedBodyExpr
+          if retTy == actualBodyTy
+           then
+             return FuncGdef {ident, params, retTy, bodyExpr=typedBodyExpr}
+           else
+             Left SemanticError{errorCode=TypeMismatchEC, errorMessage=[Here.i| Return-type of the function body should be '${retTy}' but found '${actualBodyTy}'|]}
 
 -- | Program () => Program Ty
 programToTypedProgram :: Program () -> Either SemanticError (Program Ty)
