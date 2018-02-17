@@ -1,0 +1,10 @@
+(@global-let a Int
+    (@if 10
+        1515
+        3322
+    )
+)
+
+(@func main [] Unit
+    Unit
+)

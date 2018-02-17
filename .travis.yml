@@ -1,0 +1,62 @@
+# (from: https://raw.githubusercontent.com/commercialhaskell/stack/master/doc/travis-simple.yml)
+# (from: https://github.com/llvm-hs/llvm-hs-quote/blob/57ef322aac58bb0fecfac9e0ecc37db96d387aeb/.travis.yml)
+
+# This is the simple Travis configuration, which is intended for use
+# on applications which do not require cross-platform and
+# multiple-GHC-version support. For more information and other
+# options, see:
+#
+# https://docs.haskellstack.org/en/stable/travis_ci/
+#
+# Copy these contents into the root directory of your Github project in a file
+# named .travis.yml
+
+
+sudo: false
+dist: trusty
+
+# Do not choose a language; we provide our own build tools.
+language: generic
+
+# Caching so the next build will be fast too.
+cache:
+  directories:
+  - $HOME/.stack
+
+# Ensure necessary system libraries are present
+addons:
+  apt:
+    packages:
+      - libgmp-dev
+      - llvm-5.0-dev
+    sources:
+      - llvm-toolchain-trusty-5.0
+      - ubuntu-toolchain-r-test
+
+before_install:
+# Download and unpack the stack executable
+- mkdir -p ~/.local/bin
+- export PATH=$HOME/.local/bin:$PATH
+- travis_retry curl -L https://www.stackage.org/stack/linux-x86_64 | tar xz --wildcards --strip-components=1 -C ~/.local/bin '*/stack'
+
+install:
+- stack update
+# Build dependencies
+- stack --no-terminal --install-ghc test --only-dependencies
+
+
+script:
+- stack setup
+- stack build
+# Test
+- stack test
+# == Working test of compiler ==
+# Install as command
+- stack install
+# [Compile]
+- platyc ./platy_programs/should_pass/fib.platy
+- ./fib
+# [Emit IR]
+- platyc --emit-llvm ./platy_programs/should_pass/fib.platy > fib.ll
+- cat fib.ll
+- lli-5.0 fib.ll

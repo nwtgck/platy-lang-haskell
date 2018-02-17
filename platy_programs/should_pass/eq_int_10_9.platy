@@ -1,0 +1,6 @@
+(@func main [] Unit
+    (@if (eq-int [10, 9])
+        (print-int [3355])
+        (print-int [6600])
+    )
+)

@@ -1,0 +1,96 @@
+name:                platy-lang
+version:             1.0.0
+github:              "nwtgck/platy-lang-haskell"
+license:             BSD3
+author:              "Ryo Ota"
+maintainer:          "nwtgck@gmail.com"
+copyright:           "2018 Ryo Ota"
+
+extra-source-files:
+- README.md
+- CHANGELOG.md
+
+# Metadata used when publishing your package
+synopsis:            Short description of your package
+# category:            Web
+
+# To avoid duplicated efforts in documentation and dealing with the
+# complications of embedding Haddock markup inside cabal files, it is
+# common to point users to the README.md file.
+description:         Please see the README on Github at <https://github.com/nwtgck/platy-lang-haskell#readme>
+
+dependencies:
+- base >= 4.7 && < 5
+
+library:
+  source-dirs: src
+  ghc-options:
+   - -Werror=missing-fields
+   - -Werror=incomplete-patterns
+  dependencies:
+   - mtl
+   - containers
+   - bytestring
+   - transformers
+   - MissingH
+   - here
+   - parsec
+   - llvm-hs
+   - llvm-hs-pure
+   - llvm-hs-pretty
+   - llvm-hs-quote
+
+executables:
+  platyc:
+    main:                Main.hs
+    source-dirs:         app
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    - -Werror=missing-fields
+    - -Werror=incomplete-patterns
+    dependencies:
+     - platy-lang
+     - containers
+     - bytestring
+     - text
+     - here
+     - optparse-applicative
+     - temporary
+     - process
+     - parsec
+     - filepath
+     - open-union
+     - either
+     - llvm-hs
+     - llvm-hs-pure
+     - llvm-hs-pretty
+
+tests:
+  platy-lang-test:
+    main:                Spec.hs
+    source-dirs:         test
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    - -Werror=missing-fields
+    - -Werror=incomplete-patterns
+    dependencies:
+     - platy-lang
+     - hspec
+     - QuickCheck
+     - containers
+     - bytestring
+     - text
+     - temporary
+     - process
+     - here
+     - parsec
+     - filepath
+     - mtl
+     - llvm-hs
+     - llvm-hs-pure
+     - llvm-hs-pretty
+

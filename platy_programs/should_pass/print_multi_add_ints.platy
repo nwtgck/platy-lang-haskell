@@ -1,0 +1,6 @@
+(@func main [] Unit
+    (@let [
+        (= _dummy1_ Unit (print-int [(add-int [1, 2])])),
+        (= _dummy2_ Unit (print-int [(add-int [3, 4])]))
+    ] Unit)
+)

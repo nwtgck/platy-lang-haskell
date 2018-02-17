@@ -1,0 +1,22 @@
+                                                                        ; [Pseudo code]
+                                                                        ;
+(@func fib [(:: n Int)] Int                                             ; func fib(n :: Int) -> Int =
+    (@if (or [(eq-int [n, 0]), (eq-int [n, 1])])                        ;   if (n == 0 || n == 1)
+        1                                                               ;     then 1
+        (add-int [(fib [(sub-int [n, 2])]), (fib [(sub-int [n, 1])])])  ;     else fib (n - 2) + fib (n - 1)
+    )                                                                   ;
+)                                                                       ;
+                                                                        ;
+(@func main [] Unit                                                     ; func main() -> Unit =
+    (@let [                                                             ;   let
+        ; Calculate fib(1)                                              ;     // Calculate fib(1)
+        (= fib1  Int (fib [1])),                                        ;     fib1 :: Int   = fib(1)
+        ; Print it                                                      ;     // Print it
+        (= _1 Unit (print-int [fib1])),                                 ;     _1   :: Unit  = print_int(fib1)
+                                                                        ;
+        ; Calculate fib(30)                                             ;     // Calculate fib(30)
+        (= fib30 Int (fib [30])),                                       ;     fib30 :: Int  = fib 30
+        ; Print it                                                      ;     // Print it
+        (= _2 Unit (print-int [fib30]))                                 ;     _2    :: Unit = print_int(fib30)
+    ] Unit)                                                             ;   in Unit
+)

@@ -1,0 +1,8 @@
+/.stack-work/
+/platy-lang.cabal
+
+# For IntelliJ IDEA
+/.idea
+/out
+/cabal.config
+/platy-lang.iml

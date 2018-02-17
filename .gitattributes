@@ -1,0 +1,8 @@
+# (from: http://rhysd.hatenablog.com/entry/2017/02/17/233320)
+# (from: https://github.com/github/linguist)
+
+# .platy highlighted as Clojure
+*.platy linguist-language=clojure
+
+# .platy ignored in Language Rate in GitHub
+platy_programs/* linguist-vendored
