@@ -1,6 +1,6 @@
 name:                platy-lang
-version:             1.0.0-SNAPSHOT
-github:              "nwtgck/platy-lang"
+version:             1.0.0
+github:              "nwtgck/platy-lang-haskell"
 license:             BSD3
 author:              "Ryo Ota"
 maintainer:          "nwtgck@gmail.com"
@@ -17,7 +17,7 @@ synopsis:            Short description of your package
 # To avoid duplicated efforts in documentation and dealing with the
 # complications of embedding Haddock markup inside cabal files, it is
 # common to point users to the README.md file.
-description:         Please see the README on Github at <https://github.com/nwtgck/platy-lang#readme>
+description:         Please see the README on Github at <https://github.com/nwtgck/platy-lang-haskell#readme>
 
 dependencies:
 - base >= 4.7 && < 5
