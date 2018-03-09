@@ -1,0 +1,13 @@
+(@func myfunc [(:: b1 Bool), (:: b2 Bool)] Int
+    (@if b1
+        100
+        (@if b2
+            200
+            300
+        )
+    )
+)
+
+(@func main [] Unit
+    (print-int [(myfunc [False, True])])
+)
