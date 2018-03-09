@@ -246,10 +246,12 @@ exprToExprCodegen (ifexpr@IfExpr {anno, condExpr, thenExpr, elseExpr}) = do
   thenOperand <- exprToExprCodegen thenExpr
   -- Add a instruction
   stackInstruction (thenValueName := [Quote.LLVM.lli|$opr:thenOperand|])
+  -- Get last-block-label name of then
+  thenLastBlockLabel:_ <- gets stackedLabels
   -- Set terminator of then
   setTerminator (AST.Do [Quote.LLVM.llt|br label $id:endLabel|])
 
-  -- ==== Then Block ====
+  -- ==== Else Block ====
   -- Set else-label
   addLabel (elseLabel)
   -- Eval elseExpr to Operand
@@ -257,12 +259,14 @@ exprToExprCodegen (ifexpr@IfExpr {anno, condExpr, thenExpr, elseExpr}) = do
   elseOperand <- exprToExprCodegen elseExpr
   -- Add a instruction
   stackInstruction (elseValueName := [Quote.LLVM.lli|$opr:elseOperand|])
-  -- Set terminator of then
+  -- Get last-block-label name of else
+  elseLastBlockLabel:_ <- gets stackedLabels
+  -- Set terminator of else
   setTerminator (AST.Do [Quote.LLVM.llt|br label $id:endLabel|])
 
   -- ==== End-if ====
   addLabel (endLabel)
-  stackInstruction (endValueName := [Quote.LLVM.lli|phi $type:llvmTy [$id:thenValueName, $id:thenLabel], [$id:elseValueName, $id:elseLabel]|])
+  stackInstruction (endValueName := [Quote.LLVM.lli|phi $type:llvmTy [$id:thenValueName, $id:thenLastBlockLabel], [$id:elseValueName, $id:elseLastBlockLabel]|])
 
   return $ AST.LocalReference llvmTy endValueName
 
