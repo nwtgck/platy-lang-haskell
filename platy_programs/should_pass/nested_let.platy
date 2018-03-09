@@ -1,0 +1,13 @@
+(@func myfunc [(:: x Int), (:: y Int), (:: z Int)] Int
+    (@let [
+        (= a Int (@let [
+            (= c Int x),
+            (= d Int y)
+        ] (add-int [c, d]))),
+        (= b Int z)
+    ] (add-int [a, b]))
+)
+
+(@func main [] Unit
+    (print-int [(myfunc [2200, 6611, 33])]) ; Should be 2200 + 6611 + 33 = 8844
+)

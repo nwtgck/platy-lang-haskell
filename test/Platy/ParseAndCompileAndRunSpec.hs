@@ -40,6 +40,7 @@ spec = do
                           , "or_True_False"
                           , "fib"
                           , "print_negative_int"
+                          , "nested_let"
                           ] -- NOTE: All you have to do is adding here
     let platyExtension  = "platy"
     let expectExtension = "expect"
