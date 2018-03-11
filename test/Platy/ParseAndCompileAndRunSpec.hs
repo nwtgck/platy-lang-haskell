@@ -42,6 +42,7 @@ spec = do
                           , "print_negative_int"
                           , "nested_let"
                           , "nested_if"
+                          , "nested_let_let_if"
                           ] -- NOTE: All you have to do is adding here
     let platyExtension  = "platy"
     let expectExtension = "expect"

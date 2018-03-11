@@ -1,0 +1,31 @@
+; a = 1
+; c = a + 10
+; d = if b1 then c else 4
+; b = c + d
+; myfunc => a + b
+(@func myfunc [(:: v1 Int), (:: v2 Int), (:: v3 Int), (:: b1 Bool)] Int
+    (@let [
+      (= a Int v1),
+      (= b Int (@let [
+        (= c Int (add-int [a, 10])),
+        (= d Int (@if b1
+            c
+            v3
+        ))
+      ] (add-int [c, d])))
+    ] (add-int [a, b]))
+)
+
+; Corresponding Haskell Code
+; myfunc v1 v2 v3 b1 =
+;     let a = v1
+;         b = 
+;          let c = a + 10
+;              d =  if b1
+;                      c
+;                      v3
+
+(@func main [] Unit (@let [
+    (= __1 Unit (print-int [(myfunc [1, 2, 4, True])])), ; (1 + (11 + 11))
+    (= __2 Unit (print-int [(myfunc [1, 2, 4, False])])) ; (1 + (11 + 4))
+] Unit))
