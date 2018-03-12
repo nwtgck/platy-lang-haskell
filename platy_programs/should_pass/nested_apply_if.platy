@@ -1,0 +1,10 @@
+(@func myfunc [(:: b1 Bool), (:: v1 Int), (:: v2 Int)] Unit
+    (print-int [(@if b1
+            v1
+            v2
+    )])
+)
+
+(@func main [] Unit
+    (myfunc [False, 9988, 8877])
+)

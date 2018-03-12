@@ -45,6 +45,7 @@ spec = do
                           , "nested_let_let_if"
                           , "nested_let_if_let"
                           , "nested_apply_let"
+                          , "nested_apply_if"
                           ] -- NOTE: All you have to do is adding here
     let platyExtension  = "platy"
     let expectExtension = "expect"
