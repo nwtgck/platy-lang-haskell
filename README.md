@@ -100,6 +100,7 @@ You can find actual code in [platy_programs/should_pass/fib.platy](platy_program
 * Generic function
 * Pattern Matching
 * `String` type
+* Sepration of side effects (IO monad or [Uniqueness type](https://en.wikipedia.org/wiki/Uniqueness_type))
 * Assignment
 * Object-oriented (no class, no method, no polymorphism)
 * Type class, interface, trait
