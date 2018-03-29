@@ -82,7 +82,7 @@ You can find actual code in [platy_programs/should_pass/fib.platy](platy_program
 * Non-functional
 
 
-### What Platy haves
+### What Platy has
 * Variable binding
 * Function definition
 * `Int`
