@@ -1,4 +1,4 @@
-# Platy Programming Language
+# Platy Language Compiler
 
 | branch | Travis status|
 | --- | --- |
@@ -80,6 +80,7 @@ You can find actual code in [platy_programs/should_pass/fib.platy](platy_program
 * Strict evaluation (not lazy evalluation)
 * Impure function
 * Non-functional
+* LLVM-based compiler
 
 
 ### What Platy has
